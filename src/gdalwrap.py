@@ -1,6 +1,5 @@
-# https://gdal.org/api/python_gotchas.html
-# https://medium.com/cold-brew-code/a-quick-guide-to-understanding-pythons-import-statement-505eea2d601f
-from osgeo import ogr, gdal, osr
+from osgeo import ogr
+from osgeo import osr
 ogr.UseExceptions()
 osr.UseExceptions()
 

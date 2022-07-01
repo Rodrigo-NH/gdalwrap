@@ -83,5 +83,3 @@ Removes rings from feature but keeping overall aspect (a polygon with one ring w
 Split polygons features based on max number of vertices threshold.  
 
 ```splitvertices(<feature>, <threshold>)``` -> Returns a list of resulting features
-
-[Link text Here](https://link-url-here.org)

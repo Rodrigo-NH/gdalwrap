@@ -1,4 +1,7 @@
 devnotes.txt
 image.png
+dist
+gdalwrap.egg-info
+pypi.txt
 .idea
 __pycache__/

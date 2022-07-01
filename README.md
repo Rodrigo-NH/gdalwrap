@@ -4,6 +4,8 @@ After trying alternatives to make it more usable for Python I eventually found a
 This repository is Beta/under construction and contains some basic features and some processing tools. For now I will use it to keep adding functionality and helper functions for my recurring tasks while working with shapefiles.  
 Usage can be checked in the [examples.py](https://github.com/Rodrigo-NH/gdalwrap/blob/main/src/examples.py) file  
 [Recipe](https://gist.github.com/Rodrigo-NH/7b9cbb9ea45edc13fc3f6606417d10ee) to get all gdal/gdal bindings parts installed and configured in Windows
+## Installation  
+pip install --user gdalwrap
 ## Classes/commands
 ## Setsource:
 Used to open/create shapefiles or memory datasets and set/get data (attributes, geometries, srs etc). 

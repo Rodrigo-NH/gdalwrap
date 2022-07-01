@@ -1,11 +1,12 @@
-from osgeo import ogr
-from osgeo import osr
+try:
+	from osgeo import ogr
+	from osgeo import osr
+except ImportError as error:
+	raise Exception("""ERROR: Could not find the GDAL/OGR Python library bindings.""")
 ogr.UseExceptions()
 osr.UseExceptions()
 
 def makepol(input):
-	# po = [[535604.0748090891, 7734591.620115604],[659798.5319522374, 7734591.620115604],[659798.5319522374,7892199.37349016],[535604.0748090891,7892199.37349016]]
-	# ff = geoutils.makepol(po)
 	ta = input + [input[0]]
 	tap = []
 	for t in ta:

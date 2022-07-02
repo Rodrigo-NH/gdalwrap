@@ -7,6 +7,18 @@ ogr.UseExceptions()
 osr.UseExceptions()
 
 
+class Transformation:
+	def __init__(self, sourceprj,targetprj):
+		self.sourceprj = _getsrs(sourceprj)
+		self.targetprj = _getsrs(targetprj)
+		self.transformi = osr.CoordinateTransformation(self.sourceprj, self.targetprj)
+
+	def transform(self, inputgeom):
+		if self.sourceprj != self.targetprj:
+			inputgeom.Transform(self.transformi)
+		return inputgeom
+
+
 def makepol(input):
 	ta = input + [input[0]]
 	tap = []

@@ -5,17 +5,18 @@ from gdalwrap import Layergrid
 from gdalwrap import layerclip
 from gdalwrap import splitvertices
 from gdalwrap import splitrings
-
+from gdalwrap import Transformation
 def main():
     # shapefile used in the examples: https://thematicmapping.org/downloads/TM_WORLD_BORDERS_SIMPL-0.3.zip
     # other shapefile used in the examples: https://github.com/Rodrigo-NH/assets/blob/main/files/rings.zip
     # Pick your example:
-    example01() #Iterate over shapefile attributes and geoms
-    example02() #Create memory shapefile, populate with random polygons, get/set/change attributes
-    example03() #Layergrid grid generator function example
-    example04() #layerclip function
-    example05() #splitvertices function
-    example06() #splitrings + splitvertices function
+    example01()  # Iterate over shapefile attributes and geoms
+    example02()  # Create memory shapefile, populate with random polygons, get/set/change attributes
+    example03()  # Layergrid grid generator function example
+    example04()  # layerclip function
+    example05()  # splitvertices function
+    example06()  # splitrings + splitvertices function
+
 
 def example01():
     inputshape = r'D:\shapes\TM_WORLD_BORDERS_SIMPL-0.3.shp'

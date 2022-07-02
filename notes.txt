@@ -1,3 +1,4 @@
 https://cran.r-project.org/web/packages/rgdal/vignettes/OGR_shape_encoding.pdf
 https://pcjericks.github.io/py-gdalogr-cookbook/gotchas.html#filtered-features-are-only-respected-using-getnextfeature
-
+https://gdal.org/tutorials/osr_api_tut.html
+https://gist.github.com/richpsharp/d10fa2efed2f94eaa5a605dc7fc3a4b4

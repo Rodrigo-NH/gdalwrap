@@ -6,6 +6,7 @@ except ImportError as error:
 ogr.UseExceptions()
 osr.UseExceptions()
 
+
 def makepol(input):
 	ta = input + [input[0]]
 	tap = []
@@ -33,6 +34,7 @@ def layerclip(layer, clipgeom):
 		features.append(feature)
 	return features
 
+
 def _getsrs(srs):
 	if len(str(srs)) > 7: #Can expect 'OpenGIS Well Known Text format'
 		return srs
@@ -41,7 +43,9 @@ def _getsrs(srs):
 	else:
 		osrs = osr.SpatialReference()
 		osrs.ImportFromEPSG(int(srs))
+		osrs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
 		return osrs
+
 
 class Setsource:
 	def __init__(self, inputshape, srs, Action='Open r', Type='polygon'):
@@ -209,6 +213,7 @@ def splitvertices(feature, vcount):
 		featpoll.append(ofeature)
 	return featpoll
 
+
 def splitrings(feature):
 	polcoll = []
 	temppoll = []
@@ -258,6 +263,7 @@ def splitrings(feature):
 		featpoll.append(ofeature)
 	return featpoll
 
+
 class Layergrid:
 	def __init__(self, layer,xsteps, ysteps):
 		self.layer = layer
@@ -302,6 +308,7 @@ class Layergrid:
 	def getsrs(self):
 		return self.srsv
 
+
 def fieldtypes(name):
 	ogt = [
 	['INTEGER', ogr.OFTInteger],
@@ -328,6 +335,7 @@ def fieldtypes(name):
 	for each in ogt:
 		if each[0] == name.upper():
 			return each[1]
+
 
 def getschema(layer):
 	sch = []

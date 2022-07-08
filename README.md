@@ -9,7 +9,7 @@ pip install --user gdalwrap
 ## Classes/commands
 Core commands (file core.py)
 ## Setsource:
-Used to open/create shapefiles or memory datasets and set/get data (attributes, geometries, srs etc). Native OGR objects can be accessed through class attributes so you can use these directly. These attributes are updated under appropriated conditions. For example opening a shapefile will set many of the attributes, selecting a feature will update access to ‘.geom’ attribute (with the geom associated with the selected feature). 
+Used to open/create shapefiles or memory datasets and set/get data (attributes, geometries, srs etc). Native OGR objects can be accessed through class attributes so you can use these directly. These attributes are updated under appropriated conditions. For example opening a shapefile will set many of the attributes, selecting a feature will update access to ‘.geom’ attribute (with the geom associated with the selected feature). (actually using 'osrs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)')
   
 **Class Setsource:** 
 
@@ -77,7 +77,7 @@ The following class attributes are set accordingly specific conditions
 
 **Class Transformation:**  
 
-For transformations. (reprojections etc). Takes input in either OpenGIS Well Known Text format or string with EPSG code.
+For transformations. (reprojections etc). Takes input in either OpenGIS Well Known Text format or string with EPSG code. [Example](https://github.com/Rodrigo-NH/gdalwrap/blob/main/examples/batchclip.py)
 
 ```Transformation(<sourceproj>, <destproj>)```  
 

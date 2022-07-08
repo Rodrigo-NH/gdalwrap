@@ -1,1 +1,0 @@
-from gdalwrap.gdalwrap import *

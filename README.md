@@ -2,15 +2,16 @@ After initial excitement about GDAL python bindings possibilities I realized som
 Summing-up: Python gdal/ogr objects are pointers to [SWIG](https://www.swig.org/) objects and these pointers will be collected by Python's garbage collector earlier than expected in code execution. In practice the problem is it makes writing code tied to a very monolithic approach.  
 After trying alternatives to make it more usable for Python I eventually found a way that's working until now: keeping theses pointers busy, allocated. In this case this is done by having key elements (datasources e.g.) 'grabbed' by class objects.  
 This repository is Beta/under construction and contains some basic features and some processing tools. For now I will use it to keep adding functionality and helper functions for my recurring tasks while working with shapefiles.  
-Usage can be checked in the [examples.py](https://github.com/Rodrigo-NH/gdalwrap/blob/main/gdalwrap/examples.py) file  
+Usage can be checked in the [examples.py](https://github.com/Rodrigo-NH/gdalwrap/blob/main/examples/examples.py) file  
 [Recipe](https://gist.github.com/Rodrigo-NH/7b9cbb9ea45edc13fc3f6606417d10ee) to get all gdal/gdal bindings parts installed and configured in Windows
 ## Installation  
 pip install --user gdalwrap
 ## Classes/commands
+Core commands (file core.py)
 ## Setsource:
-Used to open/create shapefiles or memory datasets and set/get data (attributes, geometries, srs etc). 
+Used to open/create shapefiles or memory datasets and set/get data (attributes, geometries, srs etc). Native OGR objects can be accessed through class attributes so you can use these directly. These attributes are updated under appropriated conditions. For example opening a shapefile will set many of the attributes, selecting a feature will update access to ‘.geom’ attribute (with the geom associated with the selected feature). 
   
-**Class Setsource:**  
+**Class Setsource:** 
 
 ```Setsource(<shapefile>, <srs>, [Action={'open r'}], [Type={'polygon'}])```  
 
@@ -20,56 +21,111 @@ Used to open/create shapefiles or memory datasets and set/get data (attributes, 
 
 ```Action= 'open r', 'open rw', 'create', 'memory'```  
  
+ *Attributes:*  
+ 
+ The following class attributes are set after class object creation
+ 
+```.shapepath``` -> Full path of shapefile  
+
+```.datasource``` -> OGR datasource  
+
+```.layer``` -> OGR layer  
+
+```.layerdef``` -> OGR layer definition  
+
+```.layertype``` -> OGR layer  type (int)  
+
+```.layertypestr``` -> OGR layer type (string)  
+
+```.srs``` -> SRS (OpenGIS Well Known Text format)
+
+
+The following class attributes are set accordingly specific conditions  
+
+```.feature``` -> OGR current feature. Set after '.getfeature()' method
+  
+
+```.geom``` -> OGR current  geom. Also set after '.getfeature()' method  
+
+```.fid``` -> Current FID number. Also set after '.getfeature()' method
+
 *Methods:*  
 
-```.layer()``` -> Get OGR layer
-
-```.getsrs()``` -> Get SRS in OpenGIS Well Known Text format
 
 ```.getattrtable()``` -> Get attribute table in list format [['fieldname', 'fieldtype'], ... ]  
 
+```.getfeatgeom(<feature>)``` -> Returns  OGR geom for any given OGR feature
+
+```.getlyrextent()``` -> Returns layer extent in a list (in map units)
+
 ```.setattrtable(<fields>)``` -> Create attribute table from list  
 
-```.getfeature(<FID>)``` -> Get feature OGR object by FID  
+```.getfeature(<FID>)``` -> Get and return feature OGR object by FID. Calling this method will update '.geom', '.feature' and '.fid' class attributes.
 
-```.createfeature(<feature>)``` -> Insert/record feature to dataset  
+```.createfeature(<feature>)``` -> Insert/record feature to dataset. Calling this method will update '.geom', '.feature' and '.fid' class attributes.
 
-```.savefile(<path>)``` -> Save memory dataset to shapefile  
+```.savefile(<path>)``` -> Save memory dataset to disk (shapefile)  
 
-```.getgeom()``` -> Get current geometry  
 
 ```.featurecount()``` -> Return the number of features
 
 ```.createattr(<name>, <type>)``` -> Create a new attribute table entry  
 
-```.geom2feature(<geom>)``` -> Create a new feature and insert a geom (optionally returns the newly created feature)  
+```.geom2feature(<geom>)``` -> Create a new feature and insert a geom (returns the newly created OGR feature). Calling this method will update '.geom', '.feature' and '.fid' class attributes.  
 
-```.setfield(<attribute>, <value>)``` -> Change/set attribute value of current feature  
+```.setfield(<attribute>, <value>)``` -> Change/set attribute value of current feature. (e.g. actual feature after .getfeature() or .createfeature() or .geom2feature())
+
+**Class Transformation:**  
+
+For transformations. (reprojections etc). Takes input in either OpenGIS Well Known Text format or string with EPSG code.
+
+```Transformation(<sourceproj>, <destproj>)```  
+
+sourceproj -> The source projection  
+
+destproj -> The destination projection
+
+
+*Methods:*  
+
+```.transform(<geom>)``` -> Apply transformation to a give geom and returns the resulting geom. Important: It does not transform the original geom.
+
+## Tools
+Tools, utils and helper functions. (file tools.py)
+
 
 **Method makepol:**  
 
 
-```makepol(<[[x1,y1],[x1,y2]...]>)``` -> Returns polygon geom from a list of coordinates
+```makepol(<[[x1,y1],[x1,y2]...]>)``` -> Returns polygon geom from a list of coordinates. (No need to repeat first coordinate)
 
 **Method layerclip:**
 
 Clips features in a layer and returns resulting feature list. Replicates attribute table values. Doesn't change input layer.  
 
-```layerclip(<layer>, <clipgeom>)``` -> Returns list of output features
+```layerclip(<layer>, <clipgeom>)``` -> Returns list of output features  
+
+layer -> The input layer to be clipped  
+
+clipgeom -> The geom used as clip mask
 
 
 **Class Layergrid:**   
 
-Creates a grid with total extent of a given layer. X and Y steps in current map units. Inherits srs from layer. User inputs 'Xstep' and 'Ystep' will be adjusted (changed) to match layer's extent exactly.
+Creates a grid with the total extent of a given layer. X and Y steps in current map units or total number of tiles. Inherits srs from layer. User inputs 'Xstep' and 'Ystep' will be adjusted (changed) to match layer's extent exactly.
 
-```Layergrid(<layer>, <Xstep>, <Ystep>)```  
+```Layergrid(<layer>, <Xstep>, <Ystep>, [Type='mapunits'])```  
+
+Type=  
+'mapunits' -> Default. Xstep and Ytep in map units  
+'tilenumbers' -> Xstep and Ytep as total number of tiles (e.g. Xstep=4, Ystep=4 for a 16 tiles grid)
 
 *Methods:*  
 
 ```.getgrid()``` -> Get a list with all grid geoms   
 
 
-```.gridindex()``` -> Get a STR list with grid index in the format "xi_yi"  
+```.gridindex()``` -> Get a string list with grid index in the format "xi_yi"  
 
 ```.getsrs()``` -> Get grid's associated SRS
 
@@ -85,4 +141,4 @@ Removes rings from feature but keeping overall aspect (a polygon with one ring w
 
 Split polygons features based on max number of vertices threshold.  
 
-```splitvertices(<feature>, <threshold>)``` -> Returns a list of resulting features
+```splitvertices(<feature>, <threshold>)``` -> Returns a list of resulting features  

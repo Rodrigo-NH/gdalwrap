@@ -2,3 +2,7 @@ https://cran.r-project.org/web/packages/rgdal/vignettes/OGR_shape_encoding.pdf
 https://pcjericks.github.io/py-gdalogr-cookbook/gotchas.html#filtered-features-are-only-respected-using-getnextfeature
 https://gdal.org/tutorials/osr_api_tut.html
 https://gist.github.com/richpsharp/d10fa2efed2f94eaa5a605dc7fc3a4b4
+https://gis.stackexchange.com/questions/239289/gdal-ogr-python-getgeomtype-method-returns-integer-what-is-the-matching-geo
+https://gist.github.com/walkermatt/7121427
+https://gis.stackexchange.com/questions/166523/remove-3d-geometry-in-shapefile-using-ogr
+

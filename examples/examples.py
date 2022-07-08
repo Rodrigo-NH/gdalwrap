@@ -6,6 +6,8 @@ from gdalwrap import layerclip
 from gdalwrap import splitvertices
 from gdalwrap import splitrings
 from gdalwrap import Transformation
+from gdalwrap import getfeatgeom
+
 def main():
     # shapefile used in the examples: https://thematicmapping.org/downloads/TM_WORLD_BORDERS_SIMPL-0.3.zip
     # other shapefile used in the examples: https://github.com/Rodrigo-NH/assets/blob/main/files/rings.zip
@@ -25,8 +27,8 @@ def example01():
     print(fields)
     for t in range(0, inshp.featurecount()):
         feature = inshp.getfeature(t) #return OGR feature and set current objects for the other methods (.getgeom() e.g.)
-        geom = inshp.getgeom()
-        FID = feature.GetFID()
+        geom = inshp.geom
+        FID = inshp.fid
         print(str(t) + " = " + str(FID))
         print("Field: " + fields[4][0] + ' --> ' + str(feature.GetField(fields[4][0])))
         print(geom)
@@ -47,7 +49,7 @@ def example02():
     outshp.savefile(filepath)  # Save from memory to file
 
     rework = Setsource(filepath, '', Action='open rw')  # Open recently created shape in RW mode
-    print(rework.getsrs())  # Prints shape SRS OpenGIS Well Known Text format
+    print(rework.srs)  # Prints shape SRS OpenGIS Well Known Text format
     print(rework.featurecount())  # Prints number of features in the shape
     rework.getfeature(5)  # Get feature FID=5 (and makes it the current feature),
                             # returns the feature to a variable, optionally
@@ -57,10 +59,10 @@ def example03():
     inputshape = r'D:\shapes\TM_WORLD_BORDERS_SIMPL-0.3.shp'
     outputshape = r'D:\shapes\example03.shp'
     inshp = Setsource(inputshape, '', Action='open r')
-    outshp = Setsource(outputshape, inshp.getsrs(), Action='create', Type='polygon')
+    outshp = Setsource(outputshape, inshp.srs, Action='create', Type='polygon')
     outshp.createattr('gridIndex', 'string')
 
-    grid = Layergrid(inshp.layer(), 2, 2) # Creates a grid layer, steps in map units (e.g. decimal degrees)
+    grid = Layergrid(inshp.layer, 10, 5, Type='tilenumbers') # Creates a grid layer, steps in map units (e.g. decimal degrees)
     print(grid.getsrs()) #Layergrid inherits srs from input shapefile
     gridcol = grid.getgrid() #get list of polygons from grid
     for t in range(0,len(gridcol)):
@@ -73,9 +75,9 @@ def example04():
     inputshape = r'D:\shapes\TM_WORLD_BORDERS_SIMPL-0.3.shp'
     outputshape = r'D:\shapes\example04.shp'
     inshp = Setsource(inputshape, '', Action='open r')
-    outshp = Setsource(outputshape, inshp.getsrs(), Action='create', Type='polygon')
-    inlayer = inshp.layer()
-    grid = Layergrid(inlayer, 10, 10)
+    outshp = Setsource(outputshape, inshp.srs, Action='create', Type='polygon')
+    inlayer = inshp.layer
+    grid = Layergrid(inlayer, 10, 5, Type='mapunits')
     gridcol = grid.getgrid()  # get list of polygons from grid
     fields = inshp.getattrtable()
     outshp.setattrtable(fields)
@@ -88,7 +90,7 @@ def example05():
     inshape = r'D:\shapes\TM_WORLD_BORDERS_SIMPL-0.3.shp'
     outshape = r'D:\shapes\example05.shp'
     inshp = Setsource(inshape, '', Action='open r')
-    outshp = Setsource('mymemlayer', inshp.getsrs(), Action='memory')
+    outshp = Setsource('mymemlayer', inshp.srs, Action='memory')
     fields = inshp.getattrtable()
     outshp.setattrtable(fields)
     for t in range(0, inshp.featurecount()):
@@ -101,7 +103,7 @@ def example06():
     inshape = r'D:\shapes\rings.shp'
     outshape = r'D:\shapes\example06.shp'
     inshp = Setsource(inshape, '', Action='open r')
-    outshp = Setsource('mymemlayer', inshp.getsrs(), Action='memory')
+    outshp = Setsource('mymemlayer', inshp.srs, Action='memory')
     fields = inshp.getattrtable()
     outshp.setattrtable(fields)
     for t in range(0, inshp.featurecount()):

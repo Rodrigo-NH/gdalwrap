@@ -3,6 +3,8 @@ try:
 	from osgeo import osr
 except ImportError as error:
 	raise Exception("""ERROR: Could not find the GDAL/OGR Python library bindings.""")
+# from os import walk
+import os
 ogr.UseExceptions()
 osr.UseExceptions()
 
@@ -37,8 +39,8 @@ def layerclip(layer, clipgeom):
 
 
 def splitvertices(feature, vcount):
-	strange = [] #Will lose SWIG object reference in debug mode after .GetGeometryType(), if not appended
-						# (like pointer having a short lifetime)
+	strange = [] # Will lose SWIG object reference in debug mode after .GetGeometryType(), if not appended
+						# (like pointer having a short lifetime or something else)
 	polcoll = []
 	temppoll = []
 	featpoll = []
@@ -185,3 +187,17 @@ class Layergrid:
 
 	def getsrs(self):
 		return self.srsv
+
+def scanfiles(folder, extension):
+	files = []
+	filesout = []
+	for (dirpath, dirnames, filenames) in os.walk(folder):
+		files.extend(filenames)
+		break
+	for each in files:
+		basename = os.path.basename(each)
+		sp = basename.split('.')
+		if sp[1].upper() == extension.upper() and len(sp) == 2:
+			cp = os.path.join(folder, each)
+			filesout.append(cp)
+	return filesout

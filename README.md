@@ -1,6 +1,6 @@
 After initial excitement about GDAL python bindings possibilities I realized something was wrong, as my code could not work as expected. Fortunately checked that there’s anything wrong about it but [Python Gotchas](https://gdal.org/api/python_gotchas.html)  
 Summing-up: Python gdal/ogr objects are pointers to [SWIG](https://www.swig.org/) objects and these pointers will be collected by Python's garbage collector earlier than expected in code execution. In practice the problem is it makes writing code tied to a very monolithic approach.  
-After trying alternatives to make it more usable for Python I eventually found a way that's working until now: keeping theses pointers busy, allocated. In this case this is done by having key elements (datasources e.g.) 'grabbed' by class objects.  
+After trying alternatives to make it more usable for Python I eventually found a way that's working until now: keeping these pointers busy, allocated. In this case this is done by having key elements (datasources e.g.) 'grabbed' by class objects.  
 This repository is Beta/under construction and contains some basic features and some processing tools. For now I will use it to keep adding functionality and helper functions for my recurring tasks while working with shapefiles.  
 Usage can be checked in the [examples.py](https://github.com/Rodrigo-NH/gdalwrap/blob/main/examples/examples.py) file  
 [Recipe](https://gist.github.com/Rodrigo-NH/7b9cbb9ea45edc13fc3f6606417d10ee) to get all gdal/gdal bindings parts installed and configured in Windows
@@ -54,7 +54,6 @@ The following class attributes are set accordingly specific conditions
 
 ```.getattrtable()``` -> Get attribute table in list format [['fieldname', 'fieldtype'], ... ]  
 
-```.getfeatgeom(<feature>)``` -> Returns  OGR geom for any given OGR feature
 
 ```.getlyrextent()``` -> Returns layer extent in a list (in map units)
 
@@ -89,6 +88,14 @@ destproj -> The destination projection
 *Methods:*  
 
 ```.transform(<geom>)``` -> Apply transformation to a give geom and returns the resulting geom. Important: It does not transform the original geom.
+
+**General methods:**  
+
+```getfeatgeom(<feature>)``` -> Returns  OGR geom for any given OGR feature  
+
+```geomptcount(<geom>)``` -> Returns total number of points/vertices of a given geometry
+
+
 
 ## Tools
 Tools, utils and helper functions. (file tools.py)

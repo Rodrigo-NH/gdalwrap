@@ -95,7 +95,7 @@ class Setsource:
 		return sch
 
 	def setattrtable(self, attrtable):
-		for field in attrtable:  # recreates attribute table on output shapefile
+		for field in attrtable:  # recreates attribute table
 			fieldtype = fieldtypes(field[1])
 			self.layer.CreateField(ogr.FieldDefn(field[0], fieldtype))
 
@@ -143,7 +143,7 @@ def layertypes(name):
 		['POINT', ogr.wkbPoint],
 		['LINE', ogr.wkbLineString],
 		['LINE STRING', ogr.wkbLineString],
-		['MULTIPOINT', ogr.wkbMultiPoint],
+		['MULTI POINT', ogr.wkbMultiPoint],
 		['MULTILINE', ogr.wkbMultiLineString],
 		['MULTIPOLYGON', ogr.wkbMultiPolygon]
 	]
@@ -206,3 +206,43 @@ def getschema(layer):
 def getfeatgeom(feature):
 	geom = feature.GetGeometryRef()
 	return geom
+
+
+def _g2b(geom):
+	tbyte = geom.ExportToWkb()
+	return tbyte
+
+
+def _b2g(tbyte):
+	geom = ogr.CreateGeometryFromWkb(tbyte)
+	return geom
+
+
+def geomptcount(geom):
+	strange = [] # Will lose SWIG object reference in debug mode after ..GetGeometryCount(), if not appended
+						# (like pointer having a short lifetime or something else)
+	tp = _g2b(geom)
+	temp = [tp]
+	pc = 0
+	while len(temp) > 0:
+		tg = None
+		pp = temp.pop(0)
+		tg = _b2g(pp)
+		# strange.append(tg)
+		ct = tg.GetGeometryCount()
+		if ct == 0:
+			ptt = tg.GetPointCount()
+			pc += ptt
+		else:
+			for t in range(0, ct):
+				tc = None
+				geomo = tg.GetGeometryRef(t)
+				gt = geomo.GetGeometryName()
+				if gt == 'LINEARRING': # workaround because linearring to WKT or WKB doesn't work..
+					ptt = geomo.GetPointCount()
+					pc += ptt
+					pc -= 1 # linearring duplicates 1 vertice
+				else:
+					tc = _g2b(geomo)
+					temp.append(tc)
+	return pc

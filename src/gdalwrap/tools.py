@@ -70,52 +70,58 @@ def splitvertices(feature, vcount):
 
 
 def splitrings(feature):
-	polcoll = []
-	temppoll = []
+	tg = getfeatgeom(feature)
+	typ = tg.GetGeometryType()
 	featpoll = []
-	geom = feature.GetGeometryRef().ExportToWkb()
-	temppoll.append(geom)
-	while len(temppoll) > 0:
-		current = temppoll.pop(0)
-		igeom = ogr.CreateGeometryFromWkb(current)
-		gtype = igeom.GetGeometryType()
-		if gtype == 6: #Clip operation may create multipolygon
-			for geom in igeom:
-				temppoll.append(geom.ExportToWkb())
-			current = temppoll.pop()
-		geom = ogr.CreateGeometryFromWkb(current)
-		hasring = geom.GetGeometryCount()
-		if hasring > 1:
-			outer = geom.GetGeometryRef(0)
-			inner = geom.GetGeometryRef(1)
-			outerextent = outer.GetEnvelope()
-			innerextent = inner.GetEnvelope()
-			Xhalf = innerextent[0] + (innerextent[1] - innerextent[0]) / 2
-			Xstart = outerextent[0]
-			Xend = outerextent[1]
-			Ystart = outerextent[2]
-			Yend = outerextent[3]
-			leftcutcoords = [(Xstart, Ystart), (Xhalf, Ystart), (Xhalf, Yend), (Xstart, Yend)]
-			rightcutcoords = [(Xhalf, Ystart), (Xend, Ystart), (Xend, Yend), (Xhalf, Yend)]
-			rightcutpol = makepol(rightcutcoords)
-			leftcutpol = makepol(leftcutcoords)
-			result = [leftcutpol.Intersection(geom),rightcutpol.Intersection(geom)]
-			for each in result:
-				if each.GetGeometryCount() == 1:
-					polcoll.append(each.ExportToWkb())
-				else:
-					temppoll.append(each.ExportToWkb())
-		else:
-			polcoll.append(current)
+	if typ == 6 or typ == 3:
+		polcoll = []
+		temppoll = []
+		geom = feature.GetGeometryRef().ExportToWkb()
+		temppoll.append(geom)
+		while len(temppoll) > 0:
+			current = temppoll.pop(0)
+			igeom = ogr.CreateGeometryFromWkb(current)
+			gtype = igeom.GetGeometryType()
+			if gtype == 6: #Clip operation may create multipolygon
+				for geom in igeom:
+					temppoll.append(geom.ExportToWkb())
+				current = temppoll.pop()
+			geom = ogr.CreateGeometryFromWkb(current)
+			hasring = geom.GetGeometryCount()
+			if hasring > 1:
+				outer = geom.GetGeometryRef(0)
+				inner = geom.GetGeometryRef(1)
+				outerextent = outer.GetEnvelope()
+				innerextent = inner.GetEnvelope()
+				Xhalf = innerextent[0] + (innerextent[1] - innerextent[0]) / 2
+				Xstart = outerextent[0]
+				Xend = outerextent[1]
+				Ystart = outerextent[2]
+				Yend = outerextent[3]
+				leftcutcoords = [(Xstart, Ystart), (Xhalf, Ystart), (Xhalf, Yend), (Xstart, Yend)]
+				rightcutcoords = [(Xhalf, Ystart), (Xend, Ystart), (Xend, Yend), (Xhalf, Yend)]
+				rightcutpol = makepol(rightcutcoords)
+				leftcutpol = makepol(leftcutcoords)
+				result = [leftcutpol.Intersection(geom),rightcutpol.Intersection(geom)]
+				for each in result:
+					if each.GetGeometryCount() == 1:
+						polcoll.append(each.ExportToWkb())
+					else:
+						temppoll.append(each.ExportToWkb())
+			else:
+				polcoll.append(current)
 
-	for each in polcoll:
-		dfn = feature.GetDefnRef()
-		ofeature = ogr.Feature(dfn)
-		ofeature.SetGeometry(ogr.CreateGeometryFromWkb(each))
-		for f in range(0, feature.GetFieldCount()):
-			ft = feature.GetField(f)
-			ofeature.SetField(f, ft)
-		featpoll.append(ofeature)
+		for each in polcoll:
+			dfn = feature.GetDefnRef()
+			ofeature = ogr.Feature(dfn)
+			ofeature.SetGeometry(ogr.CreateGeometryFromWkb(each))
+			for f in range(0, feature.GetFieldCount()):
+				ft = feature.GetField(f)
+				ofeature.SetField(f, ft)
+			featpoll.append(ofeature)
+	else:
+		featpoll.append(feature)
+
 	return featpoll
 
 

@@ -7,6 +7,17 @@ ogr.UseExceptions()
 osr.UseExceptions()
 
 
+def makepol(input):
+	ta = input + [input[0]]
+	tap = []
+	for t in ta:
+		tap.append(str(t[0]) + ' ' + str(t[1]))
+	st = 'POLYGON((' + ','.join(tap) + '))'
+	poly = ogr.CreateGeometryFromWkt(st)
+	# poly = poly.ExportToWkb()
+	return poly
+
+
 def _getsrs(srs):
 	if len(str(srs)) > 7: #Can expect 'OpenGIS Well Known Text format'
 		return srs
@@ -208,12 +219,12 @@ def getfeatgeom(feature):
 	return geom
 
 
-def _g2b(geom):
+def g2b(geom):
 	tbyte = geom.ExportToWkb()
 	return tbyte
 
 
-def _b2g(tbyte):
+def b2g(tbyte):
 	geom = ogr.CreateGeometryFromWkb(tbyte)
 	return geom
 
@@ -221,13 +232,13 @@ def _b2g(tbyte):
 def geomptcount(geom):
 	strange = [] # Will lose SWIG object reference in debug mode after ..GetGeometryCount(), if not appended
 						# (like pointer having a short lifetime or something else)
-	tp = _g2b(geom)
+	tp = g2b(geom)
 	temp = [tp]
 	pc = 0
 	while len(temp) > 0:
 		tg = None
 		pp = temp.pop(0)
-		tg = _b2g(pp)
+		tg = b2g(pp)
 		# strange.append(tg)
 		ct = tg.GetGeometryCount()
 		if ct == 0:
@@ -243,6 +254,35 @@ def geomptcount(geom):
 					pc += ptt
 					pc -= 1 # linearring duplicates 1 vertice
 				else:
-					tc = _g2b(geomo)
+					tc = g2b(geomo)
 					temp.append(tc)
 	return pc
+
+
+def multi2list(geom):
+	geomlist = []
+	cc = geom.GetGeometryCount()
+	ct = geom.GetGeometryType()
+	if ct == 6 or ct == 5:
+		for t in range(0, cc):
+			geomo = geom.GetGeometryRef(t)
+			geomlist.append(geomo)
+	else:
+		geomlist.append(geom)
+
+	return geomlist
+
+
+def splithalf(geom):
+	out = []
+	env = geom.GetEnvelope()
+	Yhalf = env[2] + (env[3] - env[2]) / 2
+	upcutcoords = [(env[0], env[3]), (env[1], env[3]), (env[1], Yhalf), (env[0], Yhalf)]
+	downcutcoords = [(env[0], Yhalf), (env[1], Yhalf), (env[1], env[2]), (env[0], env[2])]
+	upcutpol = makepol(upcutcoords)
+	downcutpol = makepol(downcutcoords)
+	result = [upcutpol.Intersection(geom), downcutpol.Intersection(geom)]
+	for each in result:
+		rn = ogr.CreateGeometryFromWkb(each.ExportToWkb())
+		out.append(rn)
+	return out

@@ -93,18 +93,24 @@ destproj -> The destination projection
 
 ```getfeatgeom(<feature>)``` -> Returns  OGR geom for any given OGR feature  
 
-```geomptcount(<geom>)``` -> Returns total number of points/vertices of a given geometry
+```geomptcount(<geom>)``` -> Returns total number of points/vertices of a given geometry  
 
+```multi2list(<geom>)``` -> Return a list of individual geometries from multigeometry (multipolygon, multiline, etc)  
+
+```splithalf(<geom>)``` -> Split geom in half and returns a list with resulting geoms  
+
+```makepol(<[[x1,y1],[x1,y2]...]>)``` -> Returns polygon geom from a list of coordinates. (No need to repeat first coordinate)
 
 
 ## Tools
 Tools, utils and helper functions. (file tools.py)
 
 
-**Method makepol:**  
+**Method splithalf:**  
 
 
-```makepol(<[[x1,y1],[x1,y2]...]>)``` -> Returns polygon geom from a list of coordinates. (No need to repeat first coordinate)
+```splithalf(<geom>)``` -> Split geom in half and returns a list with resulting geoms
+
 
 **Method layerclip:**
 
@@ -149,3 +155,5 @@ Removes rings from feature but keeping overall aspect (a polygon with one ring w
 Split polygons features based on max number of vertices threshold.  
 
 ```splitvertices(<feature>, <threshold>)``` -> Returns a list of resulting features  
+
+ 

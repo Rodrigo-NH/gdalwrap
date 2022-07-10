@@ -10,16 +10,6 @@ osr.UseExceptions()
 
 from gdalwrap.core import *
 
-def makepol(input):
-	ta = input + [input[0]]
-	tap = []
-	for t in ta:
-		tap.append(str(t[0]) + ' ' + str(t[1]))
-	st = 'POLYGON((' + ','.join(tap) + '))'
-	poly = ogr.CreateGeometryFromWkt(st)
-	# poly = poly.ExportToWkb()
-	return poly
-
 
 def layerclip(layer, clipgeom):
 	schema = getschema(layer)
@@ -39,52 +29,43 @@ def layerclip(layer, clipgeom):
 
 
 def splitvertices(feature, vcount):
-	strange = [] # Will lose SWIG object reference in debug mode after .GetGeometryType(), if not appended
-						# (like pointer having a short lifetime or something else)
-	polcoll = []
-	temppoll = []
 	featpoll = []
-	geom = feature.GetGeometryRef().ExportToWkb()
-	temppoll.append(geom)
-	while len(temppoll) > 0:
-		current = temppoll.pop(0)
-		igeom = ogr.CreateGeometryFromWkb(current)
-		# strange.append(igeom)
-		gtype = igeom.GetGeometryType()
-		if gtype == 6:
-			gc = igeom.GetGeometryCount()
-			for i in range(0, gc):
-				g = igeom.GetGeometryRef(i)
-				temppoll.append(g.ExportToWkb())
-			current = temppoll.pop()
-			igeom = ogr.CreateGeometryFromWkb(current)
-		fa = igeom.GetGeometryCount()
-		pointcount = 0
-		for t in range(0, fa):
-			go = igeom.GetGeometryRef(t)
-			pc = go.GetPointCount()
-			pointcount += pc
-		if pointcount > vcount:
-			env = igeom.GetEnvelope()
-			Yhalf = env[2] + (env[3] - env[2]) / 2
-			upcutcoords = [(env[0], env[3]), (env[1], env[3]), (env[1], Yhalf), (env[0], Yhalf)]
-			downcutcoords = [(env[0], Yhalf), (env[1], Yhalf), (env[1], env[2]), (env[0], env[2])]
-			upcutpol = makepol(upcutcoords)
-			downcutpol = makepol(downcutcoords)
-			result = [upcutpol.Intersection(igeom), downcutpol.Intersection(igeom)]
-			for each in result:
-				temppoll.append(each.ExportToWkb())
-		else:
-			polcoll.append(current)
-	for each in polcoll:
-		geom = ogr.CreateGeometryFromWkb(each)
-		dfn = feature.GetDefnRef()
-		ofeature = ogr.Feature(dfn)
-		ofeature.SetGeometry(geom)
-		for f in range(0, feature.GetFieldCount()):
-			ft = feature.GetField(f)
-			ofeature.SetField(f, ft)
-		featpoll.append(ofeature)
+	if vcount < 3:
+		featpoll.append(feature)
+	else:
+		g = g2b(getfeatgeom(feature))
+		temppoll = []
+		temppoll.append(g)
+		polcoll = []
+		strange = [] # Will lose SWIG object reference in debug mode after .GetGeometryType(), if not appended
+							# (like pointer having a short lifetime or something else)
+
+		while len(temppoll) > 0:
+			ct = temppoll.pop(0)
+			el = None
+			el = b2g(ct)
+			# strange.append(el)
+			gl = multi2list(el)
+			for geom in gl:
+				gcount = geomptcount(geom)
+				if gcount > vcount:
+					# TS = True
+					gsplit = splithalf(geom)
+					temppoll.append(g2b(gsplit[0]))
+					temppoll.append(g2b(gsplit[1]))
+				else:
+					polcoll.append(g2b(geom))
+
+		for each in polcoll:
+			geom = b2g(each)
+			dfn = feature.GetDefnRef()
+			ofeature = ogr.Feature(dfn)
+			ofeature.SetGeometry(geom)
+			for f in range(0, feature.GetFieldCount()):
+				ft = feature.GetField(f)
+				ofeature.SetField(f, ft)
+			featpoll.append(ofeature)
+
 	return featpoll
 
 

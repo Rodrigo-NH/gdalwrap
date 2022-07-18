@@ -7,5 +7,8 @@ pypi.txt
 __pycache__/
 markdown.xlsx
 todo.txt
+test.py
+experiments
+
 
 

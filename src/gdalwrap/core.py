@@ -3,6 +3,7 @@ try:
 	from osgeo import osr
 except ImportError as error:
 	raise Exception("""ERROR: Could not find the GDAL/OGR Python library bindings.""")
+import os
 ogr.UseExceptions()
 osr.UseExceptions()
 
@@ -29,69 +30,106 @@ def _getsrs(srs):
 		osrs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
 		return osrs
 
+def getsrs(srs):
+	if len(str(srs)) > 7: #Can expect 'OpenGIS Well Known Text format'
+		return srs
+	elif len(srs) == 0:
+		return None
+	else:
+		osrs = osr.SpatialReference()
+		osrs.ImportFromEPSG(int(srs))
+		osrs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+		return osrs
+
 
 class Setsource:
-	def __init__(self, inputshape, srs, Action='Open r', Type='polygon'):
+	def __init__(self, inputshape, Action='Open r'):
 		self.action = Action
 		self.shapepath = inputshape
-		self.srs = _getsrs(srs)
+		self.srs = None
 		self.layer = None
 		self.layerdef = None
 		self.layertype = None
 		self.layertypestr = None
 		self.datasource = None
 		self.geom = None
+		self.geomtype = None
+		self.geomtypestr = None
 		self.feature = None
 		self.fid = None
+		self.layername = None
 
 		if Action.upper() == 'CREATE' or Action.upper() == 'MEMORY':
 			if Action.upper() == 'CREATE':
-				driver = ogr.GetDriverByName("ESRI Shapefile")
+				driver = ogr.GetDriverByName(filternames(inputshape))
 				ds = driver.CreateDataSource(inputshape)
 			if Action.upper() == 'MEMORY':
 				driver = ogr.GetDriverByName("MEMORY")
 				ds = driver.CreateDataSource(inputshape)
-			gt = layertypes(Type)
-			self.layer = ds.CreateLayer('', self.srs, gt)
-			self.layertype = gt
-			self.layerdef = self.layer.GetLayerDefn()
-			self.layertypestr = ogr.GeometryTypeToName(self.layerdef.GetGeomType())
-
 		if Action.upper()[:4] == 'OPEN':
-			driver = ogr.GetDriverByName("ESRI Shapefile")
 			if Action.upper()[4:].strip() == 'R':
 				rw = 0
 			elif Action.upper()[4:].strip() == 'RW':
 				rw = 1
-			ds = driver.Open(inputshape, rw)
-			self.layer = ds.GetLayer()
-			self.srs = self.layer.GetSpatialRef()
-			self.layerdef = self.layer.GetLayerDefn()
-			self.layertype = self.layerdef.GetGeomType()
-			self.layertypestr = ogr.GeometryTypeToName(self.layerdef.GetGeomType())
-
+			ds = ogr.Open(inputshape, rw)
 		self.datasource = ds
 
+	def createlayer(self, name, srs, Type='Polygon'):
+		gt = layertypes(Type)
+		self.srs = _getsrs(srs)
+		self.layer = self.datasource.CreateLayer(name, self.srs, gt)
+		self.layertype = gt
+		self.layerdef = self.layer.GetLayerDefn()
+		self.layertypestr = ogr.GeometryTypeToName(self.layerdef.GetGeomType())
+		self.layername = self.layer.GetDescription()
+		return self.layer
+
+	def getlayer(self, id):
+		self.layer = self.datasource.GetLayer(id)
+		self.srs = self.layer.GetSpatialRef()
+		self.layerdef = self.layer.GetLayerDefn()
+		self.layertype = self.layerdef.GetGeomType()
+		self.layertypestr = ogr.GeometryTypeToName(self.layerdef.GetGeomType())
+		self.layername = self.layer.GetDescription()
+		return self.layer
+
 	def getfeature(self, FID):
+		ext = os.path.splitext(self.datasource.GetName())[1].upper()
+		if ext == '.KMZ' or ext == '.KML' or ext == '.GPKG':
+			FID += 1
 		self.feature = self.layer.GetFeature(FID)
 		self.geom = self.feature.GetGeometryRef()
+		self.geomtype = self.geom.GetGeometryType()
+		self.geomtypestr = ogr.GeometryTypeToName(self.geomtype)
 		self.fid = FID
 		return self.feature
 
+
 	def savefile(self, filename):
-		if self.action.upper() != 'MEMORY':
-			print("Not a memory dataset")
-		else:
-			driver = ogr.GetDriverByName("ESRI Shapefile")
-			ds = driver.CreateDataSource(filename)
-			outly = ds.CreateLayer('', self.srs, self.layertype)
-			fields = self.getattrtable()
-			for field in fields:  # recreates attribute table on output shapefile
-				fieldtype = fieldtypes(field[1])
-				outly.CreateField(ogr.FieldDefn(field[0], fieldtype))
-			for feature in self.layer:
-				outly.CreateFeature(feature)
-			ds = None
+		dest = Setsource(filename, Action='create')
+		for ind in range(0, self.layercount()):
+			inlay = self.getlayer(ind)
+			layergeomtype = self.layertypestr
+			if layergeomtype == 'Unknown (any)': # Layer without a geometry type (e.g. KML)
+				self.getfeature(0)
+				geome = self.geom
+				layergeomtype = ogr.GeometryTypeToName(geome.GetGeometryType())
+			dest.createlayer(self.layername, self.srs, Type=layergeomtype)
+			inatt = self.getattrtable()
+			dest.setattrtable(inatt)
+			for g in range(self.featurecount()):
+				feature = self.getfeature(g)
+				geom = self.geom
+				ofeature = ogr.Feature(dest.layerdef)
+				ofeature.SetGeometry(geom)
+				for f in range(0, feature.GetFieldCount()):
+					ft = feature.GetField(f)
+					ofeature.SetField(f, ft)
+				dest.createfeature(ofeature)
+		dest = None
+
+	def layercount(self):
+		return(len(self.datasource))
 
 	def featurecount(self):
 		return len(self.layer)
@@ -134,12 +172,33 @@ class Setsource:
 		self.feature.SetField(attr, value)
 		self.layer.SetFeature(self.feature)
 
+	def getfield(self, field):
+		fv = self.feature.GetField(field)
+		return fv
+
 	def getlyrextent(self):
 		extent = []
 		le = self.layer.GetExtent()
 		for t in le:
 			extent.append(t)
 		return extent
+
+
+def _testmultitypes(setsourceobject):
+	shptypes = []
+	for sh in range(0, setsourceobject.layercount()):
+		setsourceobject.getlayer(sh)
+		for feat in range(0, setsourceobject.featurecount()):
+			setsourceobject.getfeature(feat)
+			geom = setsourceobject.geom
+			ttype = geom.GetGeometryType()
+			tstype = ogr.GeometryTypeToName(ttype)
+			if tstype not in shptypes:
+				shptypes.append(tstype)
+	if len(shptypes) > 1:
+		return True
+	else:
+		return False
 
 
 def layertypes(name):
@@ -219,12 +278,12 @@ def getfeatgeom(feature):
 	return geom
 
 
-def g2b(geom):
+def _g2b(geom):
 	tbyte = geom.ExportToWkb()
 	return tbyte
 
 
-def b2g(tbyte):
+def _b2g(tbyte):
 	geom = ogr.CreateGeometryFromWkb(tbyte)
 	return geom
 
@@ -232,13 +291,13 @@ def b2g(tbyte):
 def geomptcount(geom):
 	strange = [] # Will lose SWIG object reference in debug mode after ..GetGeometryCount(), if not appended
 						# (like pointer having a short lifetime or something else)
-	tp = g2b(geom)
+	tp = _g2b(geom)
 	temp = [tp]
 	pc = 0
 	while len(temp) > 0:
 		tg = None
 		pp = temp.pop(0)
-		tg = b2g(pp)
+		tg = _b2g(pp)
 		# strange.append(tg)
 		ct = tg.GetGeometryCount()
 		if ct == 0:
@@ -254,7 +313,7 @@ def geomptcount(geom):
 					pc += ptt
 					pc -= 1 # linearring duplicates 1 vertice
 				else:
-					tc = g2b(geomo)
+					tc = _g2b(geomo)
 					temp.append(tc)
 	return pc
 
@@ -263,7 +322,7 @@ def multi2list(geom):
 	geomlist = []
 	cc = geom.GetGeometryCount()
 	ct = geom.GetGeometryType()
-	if ct == 6 or ct == 5:
+	if ct == 6 or ct == 5 or ct == 4 or ct == -2147483642 or ct == -2147483643 or ct == -2147483644:
 		for t in range(0, cc):
 			geomo = geom.GetGeometryRef(t)
 			geomlist.append(geomo)
@@ -286,3 +345,20 @@ def splithalf(geom):
 		rn = ogr.CreateGeometryFromWkb(each.ExportToWkb())
 		out.append(rn)
 	return out
+
+
+def filternames(path):
+	cp = os.path.splitext(path)
+	ext = os.path.basename(cp[1]).upper()
+	ogt = [
+		[ '.SHP', 'ESRI Shapefile' ],
+		['.KML', 'LIBKML'],
+		['.KMZ', 'LIBKML'],
+		# ['.KML', 'KML'],
+		# ['.KMZ', 'KML'],
+		['.GPKG', 'GPKG']
+	]
+
+	for each in ogt:
+		if each[0] == ext:
+			return each[1]

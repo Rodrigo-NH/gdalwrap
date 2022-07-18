@@ -10,16 +10,15 @@ def main():
 
     # Folders where to scan for input shapefiles
     folders = [
-        r'D:\shapes\dir1',
-        r'D:\shapes\dir2',
-        r'D:\shapes\dir3'
+        r'D:\shapes\temp',
+        r'D:\shapes\temp2',
     ]
 
     # Output folder where to store resulting shapefiles
-    outputfolder = r'D:\otherplace\output',
+    outputfolder = r'D:\shapes\out'
 
     # Shapefile used as clip mask
-    clipshape = r'D:\baseshapes\clipshape.shp',
+    clipshape = r'D:\shapes\quadrante.shp'
 
     shapefiles = []
     outshapes = []
@@ -36,17 +35,20 @@ def main():
                 outshapes.append(shapeout)
                 shapefiles.append(shapepath)
 
-    clipshape = Setsource(clipshape, '', Action='open r')
+    clipshape = Setsource(clipshape, Action='open r')
+    clipshape.getlayer(0)
     clipshape.getfeature(0)
     clipgeom = clipshape.geom
     for si in range (0, len(shapefiles)):
         print("Clip: " + shapefiles[si])
-        inshp = Setsource(shapefiles[si], '', Action='open r')
-        outshape = Setsource(shapefiles[si], clipshape.srs, Action='memory', Type=inshp.layertypestr)
+        inshp = Setsource(shapefiles[si], Action='open r')
+        outshape = Setsource(shapefiles[si], Action='memory')
+        inshp.getlayer(0)
         s1 = clipshape.srs
         s2 = inshp.srs
-        sourcetrans = Transformation(s1,s2)
-        outrans = Transformation(s2,s1)
+        outshape.createlayer('nlayer', s1, Type=inshp.layertypestr)
+        sourcetrans = Transformation(s1, s2)
+        outrans = Transformation(s2, s1)
         clipgeomt = sourcetrans.transform(clipgeom)
         clipfeatures = layerclip(inshp.layer, clipgeomt)
         fields = inshp.getattrtable()

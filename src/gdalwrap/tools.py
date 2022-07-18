@@ -3,12 +3,12 @@ try:
 	from osgeo import osr
 except ImportError as error:
 	raise Exception("""ERROR: Could not find the GDAL/OGR Python library bindings.""")
-# from os import walk
-import os
+
 ogr.UseExceptions()
 osr.UseExceptions()
 
 from gdalwrap.core import *
+from gdalwrap.core import _g2b, _b2g
 
 
 def layerclip(layer, clipgeom):
@@ -33,7 +33,7 @@ def splitvertices(feature, vcount):
 	if vcount < 3:
 		featpoll.append(feature)
 	else:
-		g = g2b(getfeatgeom(feature))
+		g = _g2b(getfeatgeom(feature))
 		temppoll = []
 		temppoll.append(g)
 		polcoll = []
@@ -43,7 +43,7 @@ def splitvertices(feature, vcount):
 		while len(temppoll) > 0:
 			ct = temppoll.pop(0)
 			el = None
-			el = b2g(ct)
+			el = _b2g(ct)
 			# strange.append(el)
 			gl = multi2list(el)
 			for geom in gl:
@@ -51,13 +51,13 @@ def splitvertices(feature, vcount):
 				if gcount > vcount:
 					# TS = True
 					gsplit = splithalf(geom)
-					temppoll.append(g2b(gsplit[0]))
-					temppoll.append(g2b(gsplit[1]))
+					temppoll.append(_g2b(gsplit[0]))
+					temppoll.append(_g2b(gsplit[1]))
 				else:
-					polcoll.append(g2b(geom))
+					polcoll.append(_g2b(geom))
 
 		for each in polcoll:
-			geom = b2g(each)
+			geom = _b2g(each)
 			dfn = feature.GetDefnRef()
 			ofeature = ogr.Feature(dfn)
 			ofeature.SetGeometry(geom)

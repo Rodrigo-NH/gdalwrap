@@ -1,7 +1,7 @@
 After initial excitement about GDAL python bindings possibilities I realized something was wrong, as my code could not work as expected. Fortunately checked that there’s anything wrong about it but [Python Gotchas](https://gdal.org/api/python_gotchas.html)  
 Summing-up: Python gdal/ogr objects are pointers to [SWIG](https://www.swig.org/) objects and these pointers will be collected by Python's garbage collector earlier than expected in code execution. In practice the problem is it makes writing code tied to a very monolithic approach.  
 After trying alternatives to make it more usable for Python I eventually found a way that's working until now: keeping these pointers busy, allocated. In this case this is done by having key elements (datasources e.g.) 'grabbed' by class objects.  
-This repository is Beta/under construction and contains some basic features and some processing tools. For now I will use it to keep adding functionality and helper functions for my recurring tasks while working with shapefiles.  
+This repository is Beta/under construction and contains some basic features and some processing tools. For now I will use it to keep adding functionality and helper functions for my recurring tasks while working with GIS files.  
 Usage can be checked in the [examples.py](https://github.com/Rodrigo-NH/gdalwrap/blob/main/examples/examples.py) file  
 [Recipe](https://gist.github.com/Rodrigo-NH/7b9cbb9ea45edc13fc3f6606417d10ee) to get all gdal/gdal bindings parts installed and configured in Windows
 ## Installation  
@@ -23,7 +23,7 @@ Used to open/create shapefiles or memory datasets and set/get data (attributes, 
  
  *Attributes:*  
  
- The following class attributes are set after class object creation
+Class attributes are set/changed accordingly actual action. For example creating a Setsource object will set .shapepath and .datasource attributes. Method .getlayer() will update .layer, .layertype, .layertypestr and .srs. .getfeature() will update .feature, .geom, .geomtype, .geomtypestr and .fid.
  
 ```.shapepath``` -> Full path of shapefile  
 
@@ -39,9 +39,6 @@ Used to open/create shapefiles or memory datasets and set/get data (attributes, 
 
 ```.srs``` -> SRS (OpenGIS Well Known Text format)
 
-
-The following class attributes are set accordingly specific conditions  
-
 ```.feature``` -> OGR current feature. Set after '.getfeature()' method
   
 
@@ -49,21 +46,33 @@ The following class attributes are set accordingly specific conditions
 
 ```.fid``` -> Current FID number. Also set after '.getfeature()' method
 
+```.geomtype``` -> Geom type number. Also set after '.getfeature()' method
+
+```.geomtypestr``` -> Geom type striing. Also set after '.getfeature()' method
+
+
+
+
 *Methods:*  
 
+```.layercount()``` -> Return number of layers
 
-```.getattrtable()``` -> Get attribute table in list format [['fieldname', 'fieldtype'], ... ]  
+
+```.getlayer(<integer>)``` -> Select and return given layer
+
+
+```.getattrtable()``` -> Get current layer's attribute table in list format [['fieldname', 'fieldtype'], ... ]  
 
 
 ```.getlyrextent()``` -> Returns layer extent in a list (in map units)
 
 ```.setattrtable(<fields>)``` -> Create attribute table from list  
 
-```.getfeature(<FID>)``` -> Get and return feature OGR object by FID. Calling this method will update '.geom', '.feature' and '.fid' class attributes.
+```.getfeature(<integer>)``` -> Get and return feature OGR object by position (will be FID in the case of shapefile). Calling this method will update '.geom', '.feature' and '.fid' class attributes.
 
 ```.createfeature(<feature>)``` -> Insert/record feature to dataset. Calling this method will update '.geom', '.feature' and '.fid' class attributes.
 
-```.savefile(<path>)``` -> Save memory dataset to disk (shapefile)  
+```.savefile(<path>)``` -> Save memory dataset to disk (Tested save to KML, GPKG or SHP)  
 
 
 ```.featurecount()``` -> Return the number of features

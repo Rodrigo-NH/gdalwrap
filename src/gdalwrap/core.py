@@ -8,6 +8,12 @@ ogr.UseExceptions()
 osr.UseExceptions()
 
 
+def makepoint(input):
+	st = 'POINT(' + str(input[0]) + ' ' + str(input[1]) + ')'
+	point = ogr.CreateGeometryFromWkt(st)
+	return point
+
+
 def makepol(input):
 	ta = input + [input[0]]
 	tap = []
@@ -104,9 +110,10 @@ class Setsource:
 		self.fid = FID
 		return self.feature
 
-
-	def savefile(self, filename):
+	def savefile(self, filename, Transform=None):
 		dest = Setsource(filename, Action='create')
+		style_table = self.datasource.GetStyleTable()
+		dest.datasource.SetStyleTable(style_table)
 		for ind in range(0, self.layercount()):
 			inlay = self.getlayer(ind)
 			layergeomtype = self.layertypestr
@@ -114,14 +121,24 @@ class Setsource:
 				self.getfeature(0)
 				geome = self.geom
 				layergeomtype = ogr.GeometryTypeToName(geome.GetGeometryType())
-			dest.createlayer(self.layername, self.srs, Type=layergeomtype)
+
+			destsrs = self.srs
+			if Transform is not None:
+				trans = Transformation(self.srs, Transform)
+				destsrs = Transform
+
+			dest.createlayer(self.layername, destsrs, Type=layergeomtype)
 			inatt = self.getattrtable()
 			dest.setattrtable(inatt)
 			for g in range(self.featurecount()):
 				feature = self.getfeature(g)
+				featstyle = feature.GetStyleString()
 				geom = self.geom
+				if Transform is not None:
+					geom = trans.transform(geom)
 				ofeature = ogr.Feature(dest.layerdef)
 				ofeature.SetGeometry(geom)
+				ofeature.SetStyleString(featstyle)
 				for f in range(0, feature.GetFieldCount()):
 					ft = feature.GetField(f)
 					ofeature.SetField(f, ft)
@@ -157,18 +174,20 @@ class Setsource:
 		self.feature = feature
 		self.geom = self.feature.GetGeometryRef()
 		self.fid = feature.GetFID()
-		return feature
 
 	def geom2feature(self, geom):
 		feature = ogr.Feature(self.layerdef)
 		feature.SetGeometry(geom)
-		self.layer.CreateFeature(feature)
+		# self.layer.CreateFeature(feature)
 		self.feature = feature
 		self.geom = self.feature.GetGeometryRef()
 		self.fid = feature.GetFID()
 		return feature
 
-	def setfield(self, attr, value):
+	def setfield(self, feature, attr, value):
+		feature.SetField(attr, value)
+
+	def updatefield(self, attr, value):
 		self.feature.SetField(attr, value)
 		self.layer.SetFeature(self.feature)
 
@@ -215,7 +234,8 @@ def layertypes(name):
 		['LINE STRING', ogr.wkbLineString],
 		['MULTI POINT', ogr.wkbMultiPoint],
 		['MULTILINE', ogr.wkbMultiLineString],
-		['MULTIPOLYGON', ogr.wkbMultiPolygon]
+		['MULTIPOLYGON', ogr.wkbMultiPolygon],
+		# ['3D MEASURED POLYGON', ogr.wkbPolygon25D] # 3D MEASURED POLYGON found in a gpkg created in QGIS, whats? Using same as 3D POLYGON here
 	]
 	for each in ltypes:
 		if each[0] == name.upper():

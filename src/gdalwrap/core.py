@@ -26,18 +26,7 @@ def makepol(input):
 
 
 def _getsrs(srs):
-	if len(str(srs)) > 7: #Can expect 'OpenGIS Well Known Text format'
-		return srs
-	elif len(srs) == 0:
-		return None
-	else:
-		osrs = osr.SpatialReference()
-		osrs.ImportFromEPSG(int(srs))
-		osrs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
-		return osrs
-
-def getsrs(srs):
-	if len(str(srs)) > 7: #Can expect 'OpenGIS Well Known Text format'
+	if len(str(srs)) > 7:  # Can expect 'OpenGIS Well Known Text format'
 		return srs
 	elif len(srs) == 0:
 		return None
@@ -64,6 +53,7 @@ class Setsource:
 		self.feature = None
 		self.fid = None
 		self.layername = None
+		self.fidtable = []
 
 		if Action.upper() == 'CREATE' or Action.upper() == 'MEMORY':
 			if Action.upper() == 'CREATE':
@@ -79,6 +69,15 @@ class Setsource:
 				rw = 1
 			ds = ogr.Open(inputshape, rw)
 		self.datasource = ds
+
+	def updatefidtable(self):
+		self.fidtable = []
+		self.layer.ResetReading()
+		ftv = self.layer.GetNextFeature()
+		while ftv is not None:
+			fid = ftv.GetFID()
+			self.fidtable.append(fid)
+			ftv = self.layer.GetNextFeature()
 
 	def createlayer(self, name, srs, Type='Polygon'):
 		gt = layertypes(Type)
@@ -97,17 +96,15 @@ class Setsource:
 		self.layertype = self.layerdef.GetGeomType()
 		self.layertypestr = ogr.GeometryTypeToName(self.layerdef.GetGeomType())
 		self.layername = self.layer.GetDescription()
+		self.updatefidtable()
 		return self.layer
 
-	def getfeature(self, FID):
-		ext = os.path.splitext(self.datasource.GetName())[1].upper()
-		if ext == '.KMZ' or ext == '.KML' or ext == '.GPKG':
-			FID += 1
-		self.feature = self.layer.GetFeature(FID)
+	def getfeature(self, findex):
+		self.feature = self.layer.GetFeature(self.fidtable[findex])
 		self.geom = self.feature.GetGeometryRef()
 		self.geomtype = self.geom.GetGeometryType()
 		self.geomtypestr = ogr.GeometryTypeToName(self.geomtype)
-		self.fid = FID
+		self.fid = self.fidtable[findex]
 		return self.feature
 
 	def savefile(self, filename, Transform=None):
@@ -170,10 +167,13 @@ class Setsource:
 		self.layer.CreateField(ogr.FieldDefn(name, fieldtype))
 
 	def createfeature(self, feature):
+		# featurecounter = len(self.layer)
+		# feature.SetFID(featurecounter)
 		self.layer.CreateFeature(feature)
 		self.feature = feature
 		self.geom = self.feature.GetGeometryRef()
 		self.fid = feature.GetFID()
+		self.fidtable.append(self.fid)
 
 	def geom2feature(self, geom):
 		feature = ogr.Feature(self.layerdef)
@@ -190,6 +190,7 @@ class Setsource:
 	def updatefield(self, attr, value):
 		self.feature.SetField(attr, value)
 		self.layer.SetFeature(self.feature)
+		self.updatefidtable()
 
 	def getfield(self, field):
 		fv = self.feature.GetField(field)
@@ -221,22 +222,88 @@ def _testmultitypes(setsourceobject):
 
 
 def layertypes(name):
+	# Clue:
+	# for name in dir(ogr):
+	# 	if name.startswith('wkb'):
+	# 		i = getattr(ogr, name)
+	# 		print('%s : %d : %r' % (name, i, ogr.GeometryTypeToName(i)))
 	ltypes =[
-		[ '3D MULTI POLYGON', ogr.wkbMultiPolygon25D ],
-		['3D MULTI LINE STRING', ogr.wkbMultiLineString25D],
-		['3D MULTI POINT', ogr.wkbMultiPoint25D],
-		['3D LINE STRING', ogr.wkbLineString25D],
-		['3D POINT', ogr.wkbPoint25D],
-		['3D POLYGON', ogr.wkbPolygon25D],
-		['POLYGON', ogr.wkbPolygon],
-		['POINT', ogr.wkbPoint],
-		['LINE', ogr.wkbLineString],
+		['3D UNKNOWN (ANY)', ogr.wkb25Bit],
+		['3D UNKNOWN (ANY)', ogr.wkb25DBit],
+		['CIRCULAR STRING', ogr.wkbCircularString],
+		['MEASURED CIRCULAR STRING', ogr.wkbCircularStringM],
+		['3D CIRCULAR STRING', ogr.wkbCircularStringZ],
+		['3D MEASURED CIRCULAR STRING', ogr.wkbCircularStringZM],
+		['COMPOUND CURVE', ogr.wkbCompoundCurve],
+		['MEASURED COMPOUND CURVE', ogr.wkbCompoundCurveM],
+		['3D COMPOUND CURVE', ogr.wkbCompoundCurveZ],
+		['3D MEASURED COMPOUND CURVE', ogr.wkbCompoundCurveZM],
+		['CURVE', ogr.wkbCurve],
+		['MEASURED CURVE', ogr.wkbCurveM],
+		['CURVE POLYGON', ogr.wkbCurvePolygon],
+		['MEASURED CURVE POLYGON', ogr.wkbCurvePolygonM],
+		['3D CURVE POLYGON', ogr.wkbCurvePolygonZ],
+		['3D MEASURED CURVE POLYGON', ogr.wkbCurvePolygonZM],
+		['3D CURVE', ogr.wkbCurveZ],
+		['3D MEASURED CURVE', ogr.wkbCurveZM],
+		['GEOMETRY COLLECTION', ogr.wkbGeometryCollection],
+		['3D GEOMETRY COLLECTION', ogr.wkbGeometryCollection25D],
+		['MEASURED GEOMETRY COLLECTION', ogr.wkbGeometryCollectionM],
+		['3D MEASURED GEOMETRY COLLECTION', ogr.wkbGeometryCollectionZM],
 		['LINE STRING', ogr.wkbLineString],
+		['3D LINE STRING', ogr.wkbLineString25D],
+		['MEASURED LINE STRING', ogr.wkbLineStringM],
+		['3D MEASURED LINE STRING', ogr.wkbLineStringZM],
+		['UNRECOGNIZED: 101', ogr.wkbLinearRing],
+		['MULTI CURVE', ogr.wkbMultiCurve],
+		['MEASURED MULTI CURVE', ogr.wkbMultiCurveM],
+		['3D MULTI CURVE', ogr.wkbMultiCurveZ],
+		['3D MEASURED MULTI CURVE', ogr.wkbMultiCurveZM],
+		['MULTI LINE STRING', ogr.wkbMultiLineString],
+		['3D MULTI LINE STRING', ogr.wkbMultiLineString25D],
+		['MEASURED MULTI LINE STRING', ogr.wkbMultiLineStringM],
+		['3D MEASURED MULTI LINE STRING', ogr.wkbMultiLineStringZM],
 		['MULTI POINT', ogr.wkbMultiPoint],
-		['MULTILINE', ogr.wkbMultiLineString],
-		['MULTIPOLYGON', ogr.wkbMultiPolygon],
-		# ['3D MEASURED POLYGON', ogr.wkbPolygon25D] # 3D MEASURED POLYGON found in a gpkg created in QGIS, whats? Using same as 3D POLYGON here
-	]
+		['3D MULTI POINT', ogr.wkbMultiPoint25D],
+		['MEASURED MULTI POINT', ogr.wkbMultiPointM],
+		['3D MEASURED MULTI POINT', ogr.wkbMultiPointZM],
+		['MULTI POLYGON', ogr.wkbMultiPolygon],
+		['3D MULTI POLYGON', ogr.wkbMultiPolygon25D],
+		['MEASURED MULTI POLYGON', ogr.wkbMultiPolygonM],
+		['3D MEASURED MULTI POLYGON', ogr.wkbMultiPolygonZM],
+		['MULTI SURFACE', ogr.wkbMultiSurface],
+		['MEASURED MULTI SURFACE', ogr.wkbMultiSurfaceM],
+		['3D MULTI SURFACE', ogr.wkbMultiSurfaceZ],
+		['3D MEASURED MULTI SURFACE', ogr.wkbMultiSurfaceZM],
+		['POINT', ogr.wkbNDR],
+		['NONE', ogr.wkbNone],
+		['POINT', ogr.wkbPoint],
+		['3D POINT', ogr.wkbPoint25D],
+		['MEASURED POINT', ogr.wkbPointM],
+		['3D MEASURED POINT', ogr.wkbPointZM],
+		['POLYGON', ogr.wkbPolygon],
+		['3D POLYGON', ogr.wkbPolygon25D],
+		['MEASURED POLYGON', ogr.wkbPolygonM],
+		['3D MEASURED POLYGON', ogr.wkbPolygonZM],
+		['POLYHEDRALSURFACE', ogr.wkbPolyhedralSurface],
+		['MEASURED POLYHEDRALSURFACE', ogr.wkbPolyhedralSurfaceM],
+		['3D POLYHEDRALSURFACE', ogr.wkbPolyhedralSurfaceZ],
+		['3D MEASURED POLYHEDRALSURFACE', ogr.wkbPolyhedralSurfaceZM],
+		['SURFACE', ogr.wkbSurface],
+		['MEASURED SURFACE', ogr.wkbSurfaceM],
+		['3D SURFACE', ogr.wkbSurfaceZ],
+		['3D MEASURED SURFACE', ogr.wkbSurfaceZM],
+		['TIN', ogr.wkbTIN],
+		['MEASURED TIN', ogr.wkbTINM],
+		['3D TIN', ogr.wkbTINZ],
+		['3D MEASURED TIN', ogr.wkbTINZM],
+		['TRIANGLE', ogr.wkbTriangle],
+		['MEASURED TRIANGLE', ogr.wkbTriangleM],
+		['3D TRIANGLE', ogr.wkbTriangleZ],
+		['3D MEASURED TRIANGLE', ogr.wkbTriangleZM],
+		['UNKNOWN (ANY)', ogr.wkbUnknown],
+		['UNKNOWN (ANY)', ogr.wkbXDR]
+			]
 	for each in ltypes:
 		if each[0] == name.upper():
 			return each[1]

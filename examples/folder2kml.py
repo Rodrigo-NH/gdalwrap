@@ -12,6 +12,7 @@ def main():
     outkml = os.path.join(inputpathpath, 'outest.kml')
     tempout = Setsource('tempsource', Action='memory')
 
+
     for file in infiles:
         bn = os.path.basename(os.path.splitext(file)[0])
         inshape = Setsource(file, Action='open r')
@@ -48,6 +49,7 @@ def main():
 
         suniquev = uniquev.copy()
         suniquev.sort()
+        ct = 0
         for reg in suniquev:
             for ft in range(0, inshape.featurecount()):
                 infeat = inshape.getfeature(ft)
@@ -71,12 +73,15 @@ def main():
                     if 'POINT' in geomtype:
                         stylei = '@PointStyle'
                         nfeat.SetStyleString(stylei)
+                    ct += 1
+                    print("Processing feature: " + str(ct))
                     tempout.createfeature(nfeat)
 
     tempout.savefile(outkml, Transform='4326')
 
 
 def getpalette(index):
+
     palette = [
         '#cea714',
         '#e4ff57',
@@ -95,6 +100,8 @@ def getpalette(index):
         '#ffcff3'
     ]
 
+    if index > 14:
+        index = 0
     return palette[index]
 
 

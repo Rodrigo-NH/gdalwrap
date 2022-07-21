@@ -67,7 +67,7 @@ def example02():
     print(rework.srs)  # Prints shape SRS OpenGIS Well Known Text format
     rework.getlayer(0)
     print(rework.featurecount())  # Prints number of features in the shape
-    rework.getfeature(5)  # Get feature FID=5 (and makes it the current feature),
+    rework.getfeature(5)  # Get feature sequential feature index=5 (Not FID, necessarily) (and makes it the current feature),
                             # returns the feature to a variable, optionally
     rework.updatefield('Name', 'NotInterested')  # Change current selected feature attr field
 

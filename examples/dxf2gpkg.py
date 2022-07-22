@@ -12,8 +12,8 @@ def main():
         work.getlayer(li)
         attrbt = work.getattrtable()
         ct = 0
-        for lg in range(0, work.featurecount()):
-            tf = work.getfeature(lg)
+        fi = work.iterfeatures()
+        for feature in fi:
             gt = work.geomtypestr
             if gt not in geomtypes:
                 geomtypes.append(gt)
@@ -21,7 +21,7 @@ def main():
                 tempw.setattrtable(attrbt)
             layindex = geomtypes.index(gt)
             tempw.getlayer(layindex)
-            tempw.createfeature(tf)
+            tempw.createfeature(feature)
             ct += 1
             print("Processing feature: " + str(ct))
     tempw.savefile(outputgpkg)

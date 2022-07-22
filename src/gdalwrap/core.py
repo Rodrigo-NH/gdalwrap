@@ -54,6 +54,7 @@ class Setsource:
 		self.fid = None
 		self.layername = None
 		self.fidtable = []
+		self.fidindex = True
 
 		if Action.upper() == 'CREATE' or Action.upper() == 'MEMORY':
 			if Action.upper() == 'CREATE':
@@ -73,11 +74,15 @@ class Setsource:
 	def updatefidtable(self):
 		self.fidtable = []
 		self.layer.ResetReading()
-		ftv = self.layer.GetNextFeature()
-		while ftv is not None:
-			fid = ftv.GetFID()
-			self.fidtable.append(fid)
+		if self.fidindex:
 			ftv = self.layer.GetNextFeature()
+			while ftv is not None:
+				fid = ftv.GetFID()
+				self.fidtable.append(fid)
+				ftv = self.layer.GetNextFeature()
+		else:
+			self.fidtable = range(0,self.featurecount())
+		self.layer.ResetReading()
 
 	def createlayer(self, name, srs, Type='Polygon'):
 		gt = layertypes(Type)
@@ -106,6 +111,21 @@ class Setsource:
 		self.geomtypestr = ogr.GeometryTypeToName(self.geomtype)
 		self.fid = self.fidtable[findex]
 		return self.feature
+
+	def iterfeatures(self):
+		ftv = self.layer.GetNextFeature()
+		findex = 0
+		while ftv is not None:
+			self.feature = ftv
+			self.geom = self.feature.GetGeometryRef()
+			self.geomtype = self.geom.GetGeometryType()
+			self.geomtypestr = ogr.GeometryTypeToName(self.geomtype)
+			ftv = self.layer.GetNextFeature()
+			self.fid = self.fidtable[findex]
+			yield self.feature
+			findex += 1
+		print("Done")
+		# return False
 
 	def savefile(self, filename, Transform=None):
 		dest = Setsource(filename, Action='create')

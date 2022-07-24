@@ -8,6 +8,11 @@ ogr.UseExceptions()
 osr.UseExceptions()
 
 
+def makecircle(pointgeom, buffer, pdensity):
+	circle = pointgeom.Buffer(buffer, pdensity)
+	return circle
+
+
 def makepoint(input):
 	st = 'POINT(' + str(input[0]) + ' ' + str(input[1]) + ')'
 	point = ogr.CreateGeometryFromWkt(st)
@@ -23,6 +28,11 @@ def makepol(input):
 	poly = ogr.CreateGeometryFromWkt(st)
 	# poly = poly.ExportToWkb()
 	return poly
+
+
+def getfid(feature):
+	fid = feature.GetFID()
+	return fid
 
 
 def _getsrs(srs):
@@ -54,7 +64,8 @@ class Setsource:
 		self.fid = None
 		self.layername = None
 		self.fidtable = []
-		self.fidindex = True
+		# self.featurecollection = []
+		# self.fidindex = True
 
 		if Action.upper() == 'CREATE' or Action.upper() == 'MEMORY':
 			if Action.upper() == 'CREATE':
@@ -71,28 +82,32 @@ class Setsource:
 			ds = ogr.Open(inputshape, rw)
 		self.datasource = ds
 
-	def updatefidtable(self):
-		self.fidtable = []
-		self.layer.ResetReading()
-		if self.fidindex:
-			ftv = self.layer.GetNextFeature()
-			while ftv is not None:
-				fid = ftv.GetFID()
-				self.fidtable.append(fid)
-				ftv = self.layer.GetNextFeature()
-		else:
-			self.fidtable = range(0,self.featurecount())
-		self.layer.ResetReading()
+	# def updatefidtable(self):
+	# 	self.fidtable = []
+	# 	self.featurecollection = []
+	# 	self.layer.ResetReading()
+	# 	if self.fidindex:
+	# 		ftv = self.layer.GetNextFeature()
+	# 		while ftv is not None:
+	# 			fid = ftv.GetFID()
+	# 			self.fidtable.append(fid)
+	# 			# self.featurecollection.append(ftv)
+	# 			ftv = self.layer.GetNextFeature()
+	# 	# else:
+	# 	# 	self.fidtable = range(0,self.featurecount())
+	# 	# self.layer.ResetReading()
 
 	def createlayer(self, name, srs, Type='Polygon'):
 		gt = layertypes(Type)
 		self.srs = _getsrs(srs)
 		self.layer = self.datasource.CreateLayer(name, self.srs, gt)
+		# layer = self.datasource.CreateLayer(name, _getsrs(srs), gt)
 		self.layertype = gt
 		self.layerdef = self.layer.GetLayerDefn()
 		self.layertypestr = ogr.GeometryTypeToName(self.layerdef.GetGeomType())
 		self.layername = self.layer.GetDescription()
 		return self.layer
+		# return layer
 
 	def getlayer(self, id):
 		self.layer = self.datasource.GetLayer(id)
@@ -101,31 +116,42 @@ class Setsource:
 		self.layertype = self.layerdef.GetGeomType()
 		self.layertypestr = ogr.GeometryTypeToName(self.layerdef.GetGeomType())
 		self.layername = self.layer.GetDescription()
-		self.updatefidtable()
+		# self.updatefidtable()
 		return self.layer
 
 	def getfeature(self, findex):
-		self.feature = self.layer.GetFeature(self.fidtable[findex])
+		# if self.fidindex:
+		# 	self.feature = self.featurecollection[findex]
+		# else:
+		self.feature = self.layer.GetFeature(findex)
 		self.geom = self.feature.GetGeometryRef()
 		self.geomtype = self.geom.GetGeometryType()
 		self.geomtypestr = ogr.GeometryTypeToName(self.geomtype)
-		self.fid = self.fidtable[findex]
-		return self.feature
+		self.fid = self.feature.GetFID()
+		exportfeature = self.feature.ExportToJson()
+		# return self.feature
+		return exportfeature
 
-	def iterfeatures(self):
+	def exportgeom(self, FID):
+		ft = self.layer.GetFeature(FID)
+		geom = ft.GetGeometryRef()
+		igeom = geom.ExportToWkb()
+		exportgeom = ogr.CreateGeometryFromWkb(igeom)
+		return exportgeom
+
+	def iterfeatures(self, Action=None):
+		if Action == 'reset':
+			self.layer.ResetReading()
 		ftv = self.layer.GetNextFeature()
-		findex = 0
 		while ftv is not None:
 			self.feature = ftv
 			self.geom = self.feature.GetGeometryRef()
 			self.geomtype = self.geom.GetGeometryType()
 			self.geomtypestr = ogr.GeometryTypeToName(self.geomtype)
+			self.fid = self.feature.GetFID()
 			ftv = self.layer.GetNextFeature()
-			self.fid = self.fidtable[findex]
 			yield self.feature
-			findex += 1
-		print("Done")
-		# return False
+
 
 	def savefile(self, filename, Transform=None):
 		dest = Setsource(filename, Action='create')
@@ -135,7 +161,7 @@ class Setsource:
 			inlay = self.getlayer(ind)
 			layergeomtype = self.layertypestr
 			if layergeomtype == 'Unknown (any)': # Layer without a geometry type (e.g. KML)
-				self.getfeature(0)
+				self.getfeature(0)  # Insecure, must improve
 				geome = self.geom
 				layergeomtype = ogr.GeometryTypeToName(geome.GetGeometryType())
 
@@ -147,17 +173,19 @@ class Setsource:
 			dest.createlayer(self.layername, destsrs, Type=layergeomtype)
 			inatt = self.getattrtable()
 			dest.setattrtable(inatt)
-			for g in range(self.featurecount()):
-				feature = self.getfeature(g)
-				featstyle = feature.GetStyleString()
+			it = self.iterfeatures(Action='reset')
+			for feature in it:
+			# for g in range(self.featurecount()):
+			# 	self.getfeature(g)
+				featstyle = self.feature.GetStyleString()
 				geom = self.geom
 				if Transform is not None:
 					geom = trans.transform(geom)
 				ofeature = ogr.Feature(dest.layerdef)
 				ofeature.SetGeometry(geom)
 				ofeature.SetStyleString(featstyle)
-				for f in range(0, feature.GetFieldCount()):
-					ft = feature.GetField(f)
+				for f in range(0, self.feature.GetFieldCount()):
+					ft = self.feature.GetField(f)
 					ofeature.SetField(f, ft)
 				dest.createfeature(ofeature)
 		dest = None
@@ -184,33 +212,55 @@ class Setsource:
 
 	def createattr(self, name, Type='integer'):
 		fieldtype = fieldtypes(Type)
-		self.layer.CreateField(ogr.FieldDefn(name, fieldtype))
+		fdn = ogr.FieldDefn(name, fieldtype)
+		self.layer.CreateField(fdn)
+
 
 	def createfeature(self, feature):
 		# featurecounter = len(self.layer)
 		# feature.SetFID(featurecounter)
 		self.layer.CreateFeature(feature)
-		self.feature = feature
-		self.geom = self.feature.GetGeometryRef()
-		self.fid = feature.GetFID()
-		self.fidtable.append(self.fid)
+		# self.feature = feature
+		# self.geom = self.feature.GetGeometryRef()
+		# self.fid = feature.GetFID()
+		# fid = feature.GetFID()
+		# if self.fidindex:
+		# 	self.fidtable.append(fid)
+			# self.featurecollection.append(feature)
 
 	def geom2feature(self, geom):
 		feature = ogr.Feature(self.layerdef)
 		feature.SetGeometry(geom)
 		# self.layer.CreateFeature(feature)
-		self.feature = feature
-		self.geom = self.feature.GetGeometryRef()
-		self.fid = feature.GetFID()
+		# self.feature = feature
+		# self.geom = self.feature.GetGeometryRef()
+		# self.fid = feature.GetFID()
+		# exportfeature = feature.ExportToJson()
+		# return self.feature
+		# return exportfeature
 		return feature
 
 	def setfield(self, feature, attr, value):
 		feature.SetField(attr, value)
+		# self.layer.SetFeature(feature)
+		fid = feature.GetFID()
+		if fid != -1:
+			self.layer.SetFeature(feature)
 
-	def updatefield(self, attr, value):
-		self.feature.SetField(attr, value)
-		self.layer.SetFeature(self.feature)
-		self.updatefidtable()
+
+			# raise ValueError('A very specific bad thing happened.')
+
+		# else:
+		# 	self.layer.SetFeature(feature)
+		# if self.fidindex and fid == -1:
+		# 	self.layer.SetFeature(self.feature)
+		# 	nfid = feature.GetFID()
+		# 	self.fidindex.append(nfid)
+
+	# def updatefield(self, attr, value):
+	# 	self.feature.SetField(attr, value)
+	# 	self.layer.SetFeature(self.feature)
+		# self.updatefidtable()
 
 	def getfield(self, field):
 		fv = self.feature.GetField(field)
@@ -463,7 +513,8 @@ def filternames(path):
 		['.KMZ', 'LIBKML'],
 		# ['.KML', 'KML'],
 		# ['.KMZ', 'KML'],
-		['.GPKG', 'GPKG']
+		['.GPKG', 'GPKG'],
+		['.GEOJSON', 'GEOJSON']
 	]
 
 	for each in ogt:

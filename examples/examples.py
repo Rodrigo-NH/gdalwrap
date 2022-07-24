@@ -1,5 +1,6 @@
 from random import random
-import os
+import os, time
+from copy import deepcopy, copy
 from osgeo import ogr
 from gdalwrap import Setsource
 from gdalwrap import makepol
@@ -8,25 +9,40 @@ from gdalwrap import layerclip
 from gdalwrap import splitvertices
 from gdalwrap import splitrings
 from gdalwrap import makepoint
+from gdalwrap import getfid
+from gdalwrap import makecircle
+from gdalwrap import geomptcount
 from gdalwrap import Transformation
 
 # ZIP with files used in these examples: https://github.com/Rodrigo-NH/assets/blob/main/files/gdalwrap/examples.zip
 # Set examplespath pointing to folder containing files extracted from ZIP
 examplespath = r'D:\shapes'
 
+# Set and configure postgreSQL access or comment out postgreSQL examples (needs PostGIS)
+dbserver = "192.168.0.104"
+dbport = "5432"
+dbname = "geotest"
+dbuser = "geo"  # Use superuser account and example12() if you want to CREATE required potsgis extensions for the DB
+dbpassw = "4bnyK5XMDGQZmGEmdMye"  # Not a password leak(?)
+connstr = 'postgresql://%s:%s@%s:%s/%s' % (dbuser, dbpassw, dbserver, dbport, dbname)
+
 def main():
-    # Pick your example:
+    # Pick your example or batch run:
     example01()  # Iterate over shapefile attributes and geoms
-    example02()  # Create memory shapefile, populate with random polygons, get/set/change attributes
+    example02()  # Create memory dataset, populate, export to multiple formats, get/set/change attributes
     example03()  # Layergrid grid generator function example
     example04()  # layerclip function
     example05()  # splitvertices function
     example06()  # splitrings + splitvertices function
     example07()  # Iterate over KML/KMZ file features
-    example08()  # Saves a shapefile to GPKG and KML files
+    example08()  # Saves a shapefile to GPKG and KML files, reproject output
     example09()  # Export KMZ to a multilayer GPKG
-    example10()  # Export KMZ to multiple SHP files grouped by geometry type
+    example10()  # Export KMZ to multiple SHP files grouped by geometry type, reproject output
     example11()  # Create a KML file and apply style
+    # example12()  # PostGIS Enable PostGIS extensions on DB
+    # example13()  # PostGIS create layer and fill with 100000 random polygons
+    # example14()  # PostGIS test iterator
+    # example15()  # PostGIS manipulate data
 
 
 def example01():
@@ -34,19 +50,21 @@ def example01():
     inshp = Setsource(inputshape, Action='open r')
     inshp.getlayer(0)
     fields = inshp.getattrtable()
-    print(fields)
+
     for t in range(0, inshp.featurecount()):
-        feature = inshp.getfeature(t) #return OGR feature and set current objects for the other methods (.getgeom() e.g.)
-        geom = inshp.geom
-        FID = inshp.fid
+        fj = inshp.getfeature(t)  # returns exported OGR feature JSON (optionally) and set
+        # class attributes ('.geom' etc)
+        FID = getfid(inshp.feature)
         print(str(t) + " = " + str(FID))
-        print("Field: " + fields[4][0] + ' --> ' + str(feature.GetField(fields[4][0])))
-        print(geom)
+        print("Field: " + fields[4][0] + ' --> ' + str(inshp.feature.GetField(fields[4][0])))
+        print(inshp.geom)
+        print(fj)
+        print('===================================================================================')
 
 
 def example02():
     outshp = Setsource('myMemLayer', Action='memory')
-    outshp.createlayer('layer1', '4326', Type='polygon')
+    outshp.createlayer('polygons_1', '4326', Type='polygon')
     outshp.createattr('Name', 'string')  # Create attribute field
     outshp.createattr('NIindex', 'integer')
     for t in range(0, 10):
@@ -54,22 +72,55 @@ def example02():
                      [-abs(random()), random()], [-abs(random()), -abs(random())]]
         geom = makepol(randompol)
         feat = outshp.geom2feature(geom)  # creates and return new feature
-        outshp.setfield(feat, 'Name', 'NI-' + str(t))
-        outshp.setfield(feat, 'NIindex', t)
         outshp.createfeature(feat)
+        FID = getfid(feat)  # We can retrieve FID After geom inserted on layer
+        outshp.setfield(feat, 'Name', 'P1-' + str(FID))
+        outshp.setfield(feat, 'NIindex', t)
 
+    filepath = os.path.join(examplespath, 'example02.shp')  # Save results until now to shapefile
+    outshp.savefile(filepath)
+    filepath = os.path.join(examplespath, 'example02.geojson')  # Save results until now to geojson
+    outshp.savefile(filepath)
 
+    fidtable = []
+    featureiterator = outshp.iterfeatures(Action='reset')
+    for feature in featureiterator:
+        FID = getfid(feature)
+        fidtable.append(FID)
+
+    outshp.createlayer('polygons_2', '4326', Type='polygon')
+    outshp.createattr('Name', 'string')
+    outshp.createlayer('intersections', '4326', Type='polygon')
+    outshp.createattr('Name', 'string')
+
+    outshp.getlayer('polygons_1')
+    for index in range(0, outshp.featurecount()):
+        randompol = [[random(), -abs(random())], [random(), random()],
+                     [-abs(random()), random()], [-abs(random()), -abs(random())]]
+        geom = makepol(randompol)
+        outshp.getlayer('polygons_2')
+        feat = outshp.geom2feature(geom)
+        outshp.createfeature(feat)
+        outshp.setfield(feat, 'Name', 'P2-' + str(fidtable[index]))
+        outshp.getlayer('polygons_1')
+        geom2 = outshp.exportgeom(fidtable[index])
+        geom3 = geom.Intersection(geom2)
+        outshp.getlayer('intersections')
+        feat = outshp.geom2feature(geom3)
+        outshp.createfeature(feat)
+        outshp.setfield(feat, 'Name', 'I-' + str(fidtable[index]))
+
+    filepath = os.path.join(examplespath, 'example02.gpkg')  # Save final result to geopackage
+    outshp.savefile(filepath)
 
     filepath = os.path.join(examplespath, 'example02.shp')
-    outshp.savefile(filepath)  # Save from memory to file
-
     rework = Setsource(filepath, Action='open rw')  # Open recently created shape in RW mode
-    print(rework.srs)  # Prints shape SRS OpenGIS Well Known Text format
     rework.getlayer(0)
+    print(rework.srs)  # Prints shape SRS OpenGIS Well Known Text format
     print(rework.featurecount())  # Prints number of features in the shape
-    rework.getfeature(5)  # Get feature sequential feature index=5 (Not FID, necessarily) (and makes it the current feature),
-                            # returns the feature to a variable, optionally
-    rework.updatefield('Name', 'NotInterested')  # Change current selected feature attr field
+    rework.getfeature(5)  # Get feature FID=5 (and makes it the current feature),
+    # returns the feature to a variable, optionally
+    rework.setfield(rework.feature, 'Name', 'NotInterested')  # Change current selected feature attr field
 
 
 def example03():
@@ -89,7 +140,7 @@ def example03():
         feat = outshp.geom2feature(geom) # creates and return new feature
         outshp.createfeature(feat)
         gridindex = grid.gridindex[t] #get autogenerated index for grid tile
-        outshp.updatefield('gridIndex', gridindex) #set attribute value for current, working feature
+        outshp.setfield(feat, 'gridIndex', gridindex) #set attribute value for current, working feature
 
 
 def example04():
@@ -114,13 +165,17 @@ def example05():
     inshape = os.path.join(examplespath, 'TM_WORLD_BORDERS_SIMPL-0.3.shp')
     outshape = os.path.join(examplespath, 'example05.shp')
     inshp = Setsource(inshape, Action='open r')
+    inshp.fidindex = False  # Do not map FID values and features. Usual OGR access. '.getfeature()' will perforrm usual
+                            # OGR '.GetFeature()' random access, that's, '.getfeature()' will try access by FID value
     inshp.getlayer(0)
     outshp = Setsource('mymemlayer', Action='memory')
     outshp.createlayer('layer1', inshp.srs, Type='Polygon')
     fields = inshp.getattrtable()
     outshp.setattrtable(fields)
-    for t in range(0, inshp.featurecount()):
-        featset = splitvertices(inshp.getfeature(t), 50)
+    fi = inshp.iterfeatures()   # Wraps OGR '.GetNextFeature()' iterator, updating all related class attributes
+                                # each iteration. Returns feature each iteration
+    for feature in fi:
+        featset = splitvertices(feature, 50)  # Same as passing '.feature' class attribute
         for each in featset:
             outshp.createfeature(each)
     outshp.savefile(outshape)
@@ -136,7 +191,8 @@ def example06():
     fields = inshp.getattrtable()
     outshp.setattrtable(fields)
     for t in range(0, inshp.featurecount()):
-        featset = splitrings(inshp.getfeature(t))
+        inshp.getfeature(t)
+        featset = splitrings(inshp.feature)
         for each in featset:
             featset2 = splitvertices(each, 50)
             for f in featset2:
@@ -151,8 +207,8 @@ def example07():
         kmzset.getlayer(g)
         attrbt = kmzset.getattrtable()
         print(attrbt)
-        for t in range(0, kmzset.featurecount()):
-            uai = kmzset.getfeature(t)
+        fi = kmzset.iterfeatures()
+        for feat in fi:
             ff = kmzset.getfield('Name')
             print(ff)
             print(kmzset.geom)
@@ -162,9 +218,9 @@ def example08():
     input = os.path.join(examplespath, 'example02.shp')
     dest = Setsource(input, Action='open r')
 
-    output = os.path.join(examplespath, 'example02.gpkg')
+    output = os.path.join(examplespath, 'example08.gpkg')
     dest.savefile(output, Transform='4276')
-    output = os.path.join(examplespath, 'example02.kml')
+    output = os.path.join(examplespath, 'example08.kml')
     dest.savefile(output)
 
 
@@ -172,7 +228,7 @@ def example09():  # Export KMZ to a multilayer GPKG. KMZ contains mixed geometry
                     # Separate geoms by type, create a separate layer for each type and save to GPKG
 
     input = os.path.join(examplespath, 'examplekmz.kmz')
-    output = os.path.join(examplespath, 'examplekmz.gpkg')
+    output = os.path.join(examplespath, 'example09.gpkg')
     work = Setsource(input, Action='open r')
     tempw = Setsource('tempsource', Action='memory')
 
@@ -180,8 +236,8 @@ def example09():  # Export KMZ to a multilayer GPKG. KMZ contains mixed geometry
     for li in range(0, work.layercount()):
         work.getlayer(li)
         attrbt = work.getattrtable()
-        for lg in range(0, work.featurecount()):
-            tf = work.getfeature(lg)
+        fi = work.iterfeatures()
+        for feature in fi:
             tg = work.geom
             gt = work.geomtypestr
             if gt not in geomtypes:
@@ -190,7 +246,7 @@ def example09():  # Export KMZ to a multilayer GPKG. KMZ contains mixed geometry
                 tempw.setattrtable(attrbt)
             layindex = geomtypes.index(gt)
             tempw.getlayer(layindex)
-            tempw.createfeature(tf)
+            tempw.createfeature(feature)
     tempw.savefile(output)
 
 
@@ -198,7 +254,7 @@ def example10():  # Export KMZ to multiple SHP files. KMZ contains mixed geometr
                 # Separate geoms by type, create a separate SHP file for each type
 
     input = os.path.join(examplespath, 'examplekmz.kmz')
-    output = os.path.join(examplespath, 'examplekmz.shp')
+    output = os.path.join(examplespath, 'example10.shp')
     work = Setsource(input, Action='open r')
 
     geomtypes = []
@@ -206,8 +262,8 @@ def example10():  # Export KMZ to multiple SHP files. KMZ contains mixed geometr
     for li in range(0, work.layercount()):
         work.getlayer(li)
         attrbt = work.getattrtable()
-        for lg in range(0, work.featurecount()):
-            tf = work.getfeature(lg)
+        fi = work.iterfeatures()
+        for tf in fi:
             tg = work.geom
             gt = work.geomtypestr
             if gt not in geomtypes:
@@ -234,7 +290,7 @@ def example11():
     point = [0, 1]
     point2 = makepoint(point)
 
-    outkml = os.path.join(examplespath, 'examplekml.kml')
+    outkml = os.path.join(examplespath, 'example11.kml')
     outstyletable = os.path.join(examplespath, 'styletable.txt')
     out = Setsource(outkml, Action='create')
     out.createlayer('Folder', '4326', Type='Polygon')
@@ -258,5 +314,108 @@ def example11():
     out.createfeature(feature2)
 
 
+def example12():
+    conn = Setsource(connstr, Action='open rw')
+    sql = conn.datasource.ExecuteSQL('SELECT * FROM pg_extension')
+    exts = []
+    for tb in sql:
+        exts.append(tb.GetField(1).upper())
+    if 'POSTGIS' not in exts:
+        print("Enable PostGIS extensions")
+        conn.datasource.ExecuteSQL('CREATE EXTENSION postgis')
+        conn.datasource.ExecuteSQL('CREATE EXTENSION postgis_topology')
+
+
+def example13():
+    conn = Setsource(connstr, Action='open rw')
+    conn.createlayer('randompols', '4326', Type='Polygon')
+    conn.createattr('Name', 'string')
+    conn.createattr('NIindex', 'integer')
+    ct = 0
+    for t in range(0, 100000):
+        print("Create: " + str(ct))
+        ct += 1
+        randompol = [[random(), -abs(random())], [random(), random()],
+                     [-abs(random()), random()], [-abs(random()), -abs(random())]]
+        geom = makepol(randompol)
+        feat = conn.geom2feature(geom)  # creates and return new feature
+        conn.setfield(feat, 'Name', 'NI-' + str(t).zfill(6))
+        conn.setfield(feat, 'NIindex', t)
+        conn.createfeature(feat)
+
+
+def example14():
+    conn = Setsource(connstr, Action='open rw')
+    conn.getlayer('randompols')
+    s1 = time.time()
+    politer = conn.iterfeatures(Action='reset')  # '.ResetReading()' is passed to layer when "Action='reset'"
+    ct = 0
+    for feature in politer:  # Same effect as iterating with native OGR '.GetNextFeature()'. That's
+        # external changes (e.g. featurer delete) on layer's features will not be accounted while iterating (see testing
+        # conditions at the end of this file)
+        # but just after a '.ResetReading()' is issued on layer (or Action='reset')
+        print(ct)
+        print(conn.geomtypestr)
+        ct += 1
+
+    s2 = time.time()
+
+    # Do it again no prints overhead
+    politer = conn.iterfeatures(Action='reset')
+    for feature in politer:
+        gt = conn.geomtypestr
+
+    s3 = time.time()
+
+    print("Exec time 1-> " + str(round((s2 - s1), 2)))  # 6.69 in my setup
+    print("Exec time 2-> " + str(round((s3 - s2), 2)))  # 4.63 in my setup
+
+
+def example15():
+    conn = Setsource(connstr, Action='open rw')
+    conn.getlayer('randompols')
+    conn.createattr('isEven', 'integer')
+    conn.createattr('circleOfFID', 'integer')
+    conn.createattr('conferfid', 'integer')
+    conn.createattr('geomVcount', 'string')
+
+    ct = 0
+    it = conn.iterfeatures(Action='reset')
+    for feature in it:
+        FID = getfid(feature)
+        conn.setfield(feature, 'conferfid', FID)
+        centroidpoint = conn.geom.Centroid()
+        if (FID % 2) == 0:
+            adds = [1, 10]
+        else:
+            adds = [0, 1]
+        conn.setfield(feature, 'isEven', adds[0])
+        crcgeom = makecircle(centroidpoint, 0.09, adds[1])
+        nfeat = conn.geom2feature(crcgeom)
+        conn.createfeature(nfeat)
+        conn.setfield(nfeat, 'Name', 'Centroid')
+        conn.setfield(nfeat,'circleOfFID', FID)
+        verticecount = geomptcount(crcgeom)
+        conn.setfield(nfeat, 'geomVcount', 'Polygon has ' + str(verticecount) + ' vertices')
+        print("Processing: " + str(ct))
+        ct += 1
+        if ct == 1000:
+            break
+
+
 if __name__ == "__main__":
     main()
+
+# Test conditions for '.GetNextFeature()' reported in example14():
+# Postgis server on virtual LAN (VM same computer). In example14() Consider adding the following condition on iterator:
+#     for feature in politer:
+#         print(ct)
+#         print(conn.geomtypestr)
+#         if conn.FID == 51
+#                input("STOP1")
+#         if conn.FID == 100
+#                input("STOP2")
+#         ct += 1
+# While waiting 'STOP1' feature FID == 100 was deleted acessing the DB in QGIS and saved.
+# After pressing ENTER the loop stops again at 'STOP2'
+# Class Setsource '.iterfeatures()' makes direct calls to OGR '.GetNextFeature()'

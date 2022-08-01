@@ -2,7 +2,7 @@ from os import walk
 import os
 from gdalwrap import *
 
-os.environ['SHAPE_ENCODING'] = "cp1252" # I need this often
+# os.environ['SHAPE_ENCODING'] = "cp1252" # I need this often
 
 def main():
     '''Batch clip. Will clip and transform (reproject) output shapefiles

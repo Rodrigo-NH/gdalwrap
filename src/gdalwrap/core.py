@@ -67,6 +67,7 @@ class Setsource:
 		self.fidtable = []
 		self.drivername = None
 		self.attrtable = None
+		self.datasourcename = None
 
 		if Action.upper() == 'CREATE' or Action.upper() == 'MEMORY':
 			if Action.upper() == 'CREATE':
@@ -83,6 +84,7 @@ class Setsource:
 			ds = ogr.Open(inputshape, rw)
 		self.datasource = ds
 		self.drivername = self.datasource.GetDriver().GetName()
+		self.datasourcename = self.datasource.GetName()
 
 	def attributefilter(self, filter):
 		self.layer.SetAttributeFilter(filter)
@@ -219,11 +221,7 @@ class Setsource:
 
 	def delfeature(self, feature):
 		fid = getfid(feature)
-		# print(fid)
-		# try:
 		self.layer.DeleteFeature(fid)
-		# except:
-		# 	pass
 
 	def createfeatgeom(self, geom):
 		feature = ogr.Feature(self.layerdef)

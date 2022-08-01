@@ -28,17 +28,17 @@ connstr = 'postgresql://%s:%s@%s:%s/%s' % (dbuser, dbpassw, dbserver, dbport, db
 
 def main():
     # Pick your example or batch run:
-    example01()  # Iterate over shapefile attributes and geoms
-    example02()  # Create memory dataset, populate, export to multiple formats, get/set/change attributes
-    example03()  # Layergrid grid generator function example
-    example04()  # layerclip function
-    example05()  # splitvertices function
-    example06()  # splitrings + splitvertices function
-    example07()  # Iterate over KML/KMZ file features
-    example08()  # Saves a shapefile to GPKG and KML files, reproject output
-    example09()  # Export KMZ to a multilayer GPKG
-    example10()  # Export KMZ to multiple SHP files grouped by geometry type, reproject output
-    example11()  # Create a KML file and apply style
+    # example01()  # Iterate over shapefile attributes and geoms
+    # example02()  # Create memory dataset, populate, export to multiple formats, get/set/change attributes
+    # example03()  # Layergrid grid generator function example
+    # example04()  # layerclip function
+    # example05()  # splitvertices function
+    # example06()  # splitrings + splitvertices function
+    # example07()  # Iterate over KML/KMZ file features
+    # example08()  # Saves a shapefile to GPKG and KML files, reproject output
+    # example09()  # Export KMZ to a multilayer GPKG
+    # example10()  # Export KMZ to multiple SHP files grouped by geometry type, reproject output
+    # example11()  # Create a KML file and apply style
     example12()  # Filter by attribute and delete features
     # example30()  # PostGIS Enable PostGIS extensions on DB
     # example31()  # PostGIS create layer and fill with 100000 random polygons
@@ -172,8 +172,6 @@ def example05():
     inshape = os.path.join(examplespath, 'TM_WORLD_BORDERS_SIMPL-0.3.shp')
     outshape = os.path.join(examplespath, 'example05.shp')
     inshp = Setsource(inshape, Action='open r')
-    inshp.fidindex = False  # Do not map FID values and features. Usual OGR access. '.getfeature()' will perforrm usual
-                            # OGR '.GetFeature()' random access, that's, '.getfeature()' will try access by FID value
     inshp.getlayer(0)
     outshp = Setsource('mymemlayer', Action='memory')
     outshp.createlayer('layer1', inshp.srs, Type='Polygon')
@@ -351,13 +349,15 @@ def example12():
     for source in dc:
         source.getlayer(0)
         attr = source.getattrtable()
-        print("Delete attributes")
+        print("Delete attributes ")
+        # print("Delete attributes " + source.datasourcename)
         for field in attr:
             source.delattr(field[0])
         source.createattr('isDel', Type='integer')
         it = source.iterfeatures(Action='reset')
         ct = 0
-        print("Set new attributes")
+        print("Set new attributes ")
+        # print("Set new attributes " + source.datasourcename)
         for feat in it:
             if ct == 0:
                 source.setfield(feat, 'isDel', 0)
@@ -367,7 +367,8 @@ def example12():
                 ct = 0
         source.attributefilter('isDel = 1')
         it = source.iterfeatures(Action='reset')  # iterate again now filtered
-        print("Delete features")
+        print("Delete features ")
+        # print("Delete features " + source.datasourcename)
         for feat in it:
             source.delfeature(feat)
 

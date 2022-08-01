@@ -28,17 +28,17 @@ connstr = 'postgresql://%s:%s@%s:%s/%s' % (dbuser, dbpassw, dbserver, dbport, db
 
 def main():
     # Pick your example or batch run:
-    # example01()  # Iterate over shapefile attributes and geoms
-    # example02()  # Create memory dataset, populate, export to multiple formats, get/set/change attributes
-    # example03()  # Layergrid grid generator function example
-    # example04()  # layerclip function
-    # example05()  # splitvertices function
-    # example06()  # splitrings + splitvertices function
-    # example07()  # Iterate over KML/KMZ file features
-    # example08()  # Saves a shapefile to GPKG and KML files, reproject output
-    # example09()  # Export KMZ to a multilayer GPKG
-    # example10()  # Export KMZ to multiple SHP files grouped by geometry type, reproject output
-    # example11()  # Create a KML file and apply style
+    example01()  # Iterate over shapefile attributes and geoms
+    example02()  # Create memory dataset, populate, export to multiple formats, get/set/change attributes
+    example03()  # Layergrid grid generator function example
+    example04()  # layerclip function
+    example05()  # splitvertices function
+    example06()  # splitrings + splitvertices function
+    example07()  # Iterate over KML/KMZ file features
+    example08()  # Saves a shapefile to GPKG and KML files, reproject output
+    example09()  # Export KMZ to a multilayer GPKG
+    example10()  # Export KMZ to multiple SHP files grouped by geometry type, reproject output
+    example11()  # Create a KML file and apply style
     example12()  # Filter by attribute and delete features
     # example30()  # PostGIS Enable PostGIS extensions on DB
     # example31()  # PostGIS create layer and fill with 100000 random polygons

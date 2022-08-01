@@ -19,11 +19,11 @@ from gdalwrap import Transformation
 examplespath = r'D:\shapes'
 
 # Set and configure postgreSQL access or comment out postgreSQL examples (needs PostGIS)
-dbserver = "192.168.0.104"
+dbserver = "192.168.0.113"
 dbport = "5432"
 dbname = "geotest"
-dbuser = "geo"  # Use superuser account and example12() if you want to CREATE required potsgis extensions for the DB
-dbpassw = "4bnyK5XMDGQZmGEmdMye"  # Not a password leak(?)
+dbuser = "geo"  # Use superuser account and example30() if you want to CREATE required potsgis extensions for the DB
+dbpassw = "4bnyK5XMDGQZmGEmdMye"  # Not a password leak
 connstr = 'postgresql://%s:%s@%s:%s/%s' % (dbuser, dbpassw, dbserver, dbport, dbname)
 
 def main():
@@ -39,10 +39,12 @@ def main():
     example09()  # Export KMZ to a multilayer GPKG
     example10()  # Export KMZ to multiple SHP files grouped by geometry type, reproject output
     example11()  # Create a KML file and apply style
-    # example12()  # PostGIS Enable PostGIS extensions on DB
-    # example13()  # PostGIS create layer and fill with 100000 random polygons
-    # example14()  # PostGIS test iterator
-    # example15()  # PostGIS manipulate data
+    example12()  # Filter by attribute and delete features
+    # example30()  # PostGIS Enable PostGIS extensions on DB
+    # example31()  # PostGIS create layer and fill with 100000 random polygons
+    # example32()  # PostGIS test iterator
+    # example33()  # PostGIS manipulate data
+    # example34()  # Save SHP and GPKG to postGIS tables
 
 
 def example01():
@@ -65,13 +67,14 @@ def example01():
 def example02():
     outshp = Setsource('myMemLayer', Action='memory')
     outshp.createlayer('polygons_1', '4326', Type='polygon')
+    outshp.getlayer('polygons_1')
     outshp.createattr('Name', 'string')  # Create attribute field
     outshp.createattr('NIindex', 'integer')
     for t in range(0, 10):
         randompol = [[random(), -abs(random())], [random(), random()],
                      [-abs(random()), random()], [-abs(random()), -abs(random())]]
         geom = makepol(randompol)
-        feat = outshp.geom2feature(geom)  # creates and return new feature
+        feat = outshp.createfeatgeom(geom)  # creates and return new feature
         outshp.createfeature(feat)
         FID = getfid(feat)  # We can retrieve FID After geom inserted on layer
         outshp.setfield(feat, 'Name', 'P1-' + str(FID))
@@ -89,8 +92,10 @@ def example02():
         fidtable.append(FID)
 
     outshp.createlayer('polygons_2', '4326', Type='polygon')
+    outshp.getlayer('polygons_2')
     outshp.createattr('Name', 'string')
     outshp.createlayer('intersections', '4326', Type='polygon')
+    outshp.getlayer('intersections')
     outshp.createattr('Name', 'string')
 
     outshp.getlayer('polygons_1')
@@ -99,14 +104,14 @@ def example02():
                      [-abs(random()), random()], [-abs(random()), -abs(random())]]
         geom = makepol(randompol)
         outshp.getlayer('polygons_2')
-        feat = outshp.geom2feature(geom)
+        feat = outshp.createfeatgeom(geom)
         outshp.createfeature(feat)
         outshp.setfield(feat, 'Name', 'P2-' + str(fidtable[index]))
         outshp.getlayer('polygons_1')
         geom2 = outshp.exportgeom(fidtable[index])
         geom3 = geom.Intersection(geom2)
         outshp.getlayer('intersections')
-        feat = outshp.geom2feature(geom3)
+        feat = outshp.createfeatgeom(geom3)
         outshp.createfeature(feat)
         outshp.setfield(feat, 'Name', 'I-' + str(fidtable[index]))
 
@@ -119,7 +124,7 @@ def example02():
     print(rework.srs)  # Prints shape SRS OpenGIS Well Known Text format
     print(rework.featurecount())  # Prints number of features in the shape
     rework.getfeature(5)  # Get feature FID=5 (and makes it the current feature),
-    # returns the feature to a variable, optionally
+    # returns the feature to a variable (geojson), optionally
     rework.setfield(rework.feature, 'Name', 'NotInterested')  # Change current selected feature attr field
 
 
@@ -127,9 +132,10 @@ def example03():
     inputshape = os.path.join(examplespath, 'TM_WORLD_BORDERS_SIMPL-0.3.shp')
     outputshape = os.path.join(examplespath, 'example03.shp')
     inshp = Setsource(inputshape, Action='open r')
-    inshp.getlayer(0)
+    inshp.getlayer('')
     outshp = Setsource(outputshape, Action='create')
-    outshp.createlayer('', inshp.srs, Type=inshp.layertypestr)
+    outshp.createlayer('grid', inshp.srs, Type=inshp.layertypestr)
+    outshp.getlayer('grid')
     outshp.createattr('gridIndex', 'string')
 
     grid = Layergrid(inshp.layer, 10, 5, Type='tilenumbers') # Creates a grid layer, steps in map units (e.g. decimal degrees)
@@ -137,10 +143,10 @@ def example03():
     gridcol = grid.getgrid() #get list of polygons from grid
     for t in range(0,len(gridcol)):
         geom = gridcol[t]
-        feat = outshp.geom2feature(geom) # creates and return new feature
+        feat = outshp.createfeatgeom(geom) # creates and return new feature
         outshp.createfeature(feat)
         gridindex = grid.gridindex[t] #get autogenerated index for grid tile
-        outshp.setfield(feat, 'gridIndex', gridindex) #set attribute value for current, working feature
+        outshp.setfield(feat, 'gridIndex', gridindex) #set attribute value for giving feature
 
 
 def example04():
@@ -150,6 +156,7 @@ def example04():
     inshp.getlayer(0)
     outshp = Setsource(outputshape, Action='create')
     outshp.createlayer('layer1', inshp.srs, Type='polygon')
+    outshp.getlayer('layer1')
     inlayer = inshp.layer
     grid = Layergrid(inlayer, 10, 5, Type='mapunits')
     gridcol = grid.getgrid()  # get list of polygons from grid
@@ -170,6 +177,7 @@ def example05():
     inshp.getlayer(0)
     outshp = Setsource('mymemlayer', Action='memory')
     outshp.createlayer('layer1', inshp.srs, Type='Polygon')
+    outshp.getlayer('layer1')
     fields = inshp.getattrtable()
     outshp.setattrtable(fields)
     fi = inshp.iterfeatures()   # Wraps OGR '.GetNextFeature()' iterator, updating all related class attributes
@@ -188,6 +196,7 @@ def example06():
     inshp.getlayer(0)
     outshp = Setsource('mymemlayer', Action='memory')
     outshp.createlayer('layer1', inshp.srs, Type='Polygon')
+    outshp.getlayer('layer1')
     fields = inshp.getattrtable()
     outshp.setattrtable(fields)
     for t in range(0, inshp.featurecount()):
@@ -222,13 +231,18 @@ def example08():
     dest.savefile(output, Transform='4276')
     output = os.path.join(examplespath, 'example08.kml')
     dest.savefile(output)
+    output = os.path.join(examplespath, 'example08.pdf')
+    dest.savefile(output)
+    output = os.path.join(examplespath, 'example08.geojson')
+    dest.savefile(output)
 
 
 def example09():  # Export KMZ to a multilayer GPKG. KMZ contains mixed geometry types per 'layer'.
                     # Separate geoms by type, create a separate layer for each type and save to GPKG
 
     input = os.path.join(examplespath, 'examplekmz.kmz')
-    output = os.path.join(examplespath, 'example09.gpkg')
+    output1 = os.path.join(examplespath, 'example09.gpkg')
+    output2 = os.path.join(examplespath, 'example09.pdf')
     work = Setsource(input, Action='open r')
     tempw = Setsource('tempsource', Action='memory')
 
@@ -243,11 +257,13 @@ def example09():  # Export KMZ to a multilayer GPKG. KMZ contains mixed geometry
             if gt not in geomtypes:
                 geomtypes.append(gt)
                 tempw.createlayer(gt, '4326', Type=gt)
+                tempw.getlayer(gt)
                 tempw.setattrtable(attrbt)
             layindex = geomtypes.index(gt)
             tempw.getlayer(layindex)
             tempw.createfeature(feature)
-    tempw.savefile(output)
+    tempw.savefile(output1)
+    tempw.savefile(output2)
 
 
 def example10():  # Export KMZ to multiple SHP files. KMZ contains mixed geometry types per 'layer'.
@@ -270,6 +286,7 @@ def example10():  # Export KMZ to multiple SHP files. KMZ contains mixed geometr
                 tempw = Setsource(gt, Action='memory')
                 geomtypes.append(gt)
                 tempw.createlayer(gt, '4326', Type=gt)
+                tempw.getlayer(gt)
                 tempw.setattrtable(attrbt)
                 tempsources.append(tempw)
             sourceindex = geomtypes.index(gt)
@@ -294,6 +311,7 @@ def example11():
     outstyletable = os.path.join(examplespath, 'styletable.txt')
     out = Setsource(outkml, Action='create')
     out.createlayer('Folder', '4326', Type='Polygon')
+    out.getlayer('Folder')
     style_table = ogr.StyleTable()
     style_table.AddStyle('CoCoNuT', 'PEN(c:#C81B75FF,w:5.0px);BRUSH(fc:#1d8aa8C8)')
     style_table.AddStyle('CoCoNuT2',
@@ -303,18 +321,58 @@ def example11():
     out.datasource.SetStyleTable(style_table)
 
     out.createattr('Name', 'string')
-    feature = out.geom2feature(pol2)
+    feature = out.createfeatgeom(pol2)
     out.setfield(feature, 'Name', 'Some Polygon')
     feature.SetStyleString('@CoCoNuT')
     out.createfeature(feature)
 
-    feature2 = out.geom2feature(point2)
+    feature2 = out.createfeatgeom(point2)
     out.setfield(feature2, 'Name', 'Some Point')
     feature2.SetStyleString('@CoCoNuT2')
     out.createfeature(feature2)
 
+    outpdf = os.path.join(examplespath, 'example11.pdf')
+    out.savefile(outpdf)
+
 
 def example12():
+    shpp = os.path.join(examplespath, 'example04.shp')
+    shpout = os.path.join(examplespath, 'example12.shp')
+    gpout = os.path.join(examplespath, 'example12.gpkg')
+    shp = Setsource(shpp, Action='open r')
+    print("Save to SHP and GPKG")
+    shp.savefile(shpout)
+    shp.savefile(gpout)
+
+    nshp = Setsource(shpout, Action='open rw')
+    npkg = Setsource(gpout, Action='open rw')
+
+    dc = [npkg, nshp]
+    for source in dc:
+        source.getlayer(0)
+        attr = source.getattrtable()
+        print("Delete attributes")
+        for field in attr:
+            source.delattr(field[0])
+        source.createattr('isDel', Type='integer')
+        it = source.iterfeatures(Action='reset')
+        ct = 0
+        print("Set new attributes")
+        for feat in it:
+            if ct == 0:
+                source.setfield(feat, 'isDel', 0)
+                ct = 1
+            else:
+                source.setfield(feat, 'isDel', 1)
+                ct = 0
+        source.attributefilter('isDel = 1')
+        it = source.iterfeatures(Action='reset')  # iterate again now filtered
+        print("Delete features")
+        for feat in it:
+            source.delfeature(feat)
+
+
+def example30():
     conn = Setsource(connstr, Action='open rw')
     sql = conn.datasource.ExecuteSQL('SELECT * FROM pg_extension')
     exts = []
@@ -326,25 +384,37 @@ def example12():
         conn.datasource.ExecuteSQL('CREATE EXTENSION postgis_topology')
 
 
-def example13():
+def example31():
     conn = Setsource(connstr, Action='open rw')
     conn.createlayer('randompols', '4326', Type='Polygon')
+    conn.createlayer('randompols2', '4326', Type='Polygon')
+    conn.getlayer('randompols')
+    conn.createattr('Name', 'string')
+    conn.createattr('NIindex', 'integer')
+    conn.getlayer('randompols2')
     conn.createattr('Name', 'string')
     conn.createattr('NIindex', 'integer')
     ct = 0
-    for t in range(0, 100000):
+    cc = 0
+    for t in range(0, 1000):
         print("Create: " + str(ct))
         ct += 1
+        if cc == 0:  # Slow switching
+            conn.getlayer('randompols')
+            cc = 1
+        else:
+            conn.getlayer('randompols2')
+            cc = 0
         randompol = [[random(), -abs(random())], [random(), random()],
                      [-abs(random()), random()], [-abs(random()), -abs(random())]]
         geom = makepol(randompol)
-        feat = conn.geom2feature(geom)  # creates and return new feature
+        feat = conn.createfeatgeom(geom)  # creates and return new feature
         conn.setfield(feat, 'Name', 'NI-' + str(t).zfill(6))
         conn.setfield(feat, 'NIindex', t)
         conn.createfeature(feat)
 
 
-def example14():
+def example32():
     conn = Setsource(connstr, Action='open rw')
     conn.getlayer('randompols')
     s1 = time.time()
@@ -367,18 +437,17 @@ def example14():
 
     s3 = time.time()
 
-    print("Exec time 1-> " + str(round((s2 - s1), 2)))  # 6.69 in my setup
-    print("Exec time 2-> " + str(round((s3 - s2), 2)))  # 4.63 in my setup
+    print("Exec time 1-> " + str(round((s2 - s1), 2)))
+    print("Exec time 2-> " + str(round((s3 - s2), 2)))
 
 
-def example15():
+def example33():
     conn = Setsource(connstr, Action='open rw')
     conn.getlayer('randompols')
     conn.createattr('isEven', 'integer')
     conn.createattr('circleOfFID', 'integer')
     conn.createattr('conferfid', 'integer')
     conn.createattr('geomVcount', 'string')
-
     ct = 0
     it = conn.iterfeatures(Action='reset')
     for feature in it:
@@ -391,7 +460,7 @@ def example15():
             adds = [0, 1]
         conn.setfield(feature, 'isEven', adds[0])
         crcgeom = makecircle(centroidpoint, 0.09, adds[1])
-        nfeat = conn.geom2feature(crcgeom)
+        nfeat = conn.createfeatgeom(crcgeom)
         conn.createfeature(nfeat)
         conn.setfield(nfeat, 'Name', 'Centroid')
         conn.setfield(nfeat,'circleOfFID', FID)
@@ -399,8 +468,16 @@ def example15():
         conn.setfield(nfeat, 'geomVcount', 'Polygon has ' + str(verticecount) + ' vertices')
         print("Processing: " + str(ct))
         ct += 1
-        if ct == 1000:
-            break
+
+def example34():
+    gpinp = os.path.join(examplespath, 'example09.gpkg')
+    gpin = Setsource(gpinp, Action='open r')
+    gpin.savefile(connstr)
+
+    shpip = os.path.join(examplespath, 'example12.shp')
+    shpi = Setsource(shpip, Action='open r')
+    shpi.savefile(connstr)
+
 
 
 if __name__ == "__main__":

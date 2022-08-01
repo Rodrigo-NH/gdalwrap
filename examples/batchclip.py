@@ -2,7 +2,7 @@ from os import walk
 import os
 from gdalwrap import *
 
-# os.environ['SHAPE_ENCODING'] = "cp1252" # I need this often
+os.environ['SHAPE_ENCODING'] = "cp1252" # I need this often
 
 def main():
     '''Batch clip. Will clip and transform (reproject) output shapefiles
@@ -11,14 +11,14 @@ def main():
     # Folders where to scan for input shapefiles
     folders = [
         r'D:\shapes\temp',
-        r'D:\shapes\temp2',
+        # r'D:\shapes\temp2',
     ]
 
     # Output folder where to store resulting shapefiles
     outputfolder = r'D:\shapes\out'
 
     # Shapefile used as clip mask
-    clipshape = r'D:\shapes\quadrante.shp'
+    clipshape = r'D:\shapes\out\Quadrante.shp'
 
     shapefiles = []
     outshapes = []
@@ -47,6 +47,7 @@ def main():
         s1 = clipshape.srs
         s2 = inshp.srs
         outshape.createlayer('nlayer', s1, Type=inshp.layertypestr)
+        outshape.getlayer('nlayer')
         sourcetrans = Transformation(s1, s2)
         outrans = Transformation(s2, s1)
         clipgeomt = sourcetrans.transform(clipgeom)

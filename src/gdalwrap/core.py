@@ -4,9 +4,10 @@ try:
 except ImportError as error:
 	raise Exception("""ERROR: Could not find the GDAL/OGR Python library bindings.""")
 import os
+import warnings
 ogr.UseExceptions()
 osr.UseExceptions()
-
+from copy import copy, deepcopy
 
 def makecircle(pointgeom, buffer, pdensity):
 	circle = pointgeom.Buffer(buffer, pdensity)
@@ -64,8 +65,8 @@ class Setsource:
 		self.fid = None
 		self.layername = None
 		self.fidtable = []
-		# self.featurecollection = []
-		# self.fidindex = True
+		self.drivername = None
+		self.attrtable = None
 
 		if Action.upper() == 'CREATE' or Action.upper() == 'MEMORY':
 			if Action.upper() == 'CREATE':
@@ -81,55 +82,34 @@ class Setsource:
 				rw = 1
 			ds = ogr.Open(inputshape, rw)
 		self.datasource = ds
+		self.drivername = self.datasource.GetDriver().GetName()
 
-	# def updatefidtable(self):
-	# 	self.fidtable = []
-	# 	self.featurecollection = []
-	# 	self.layer.ResetReading()
-	# 	if self.fidindex:
-	# 		ftv = self.layer.GetNextFeature()
-	# 		while ftv is not None:
-	# 			fid = ftv.GetFID()
-	# 			self.fidtable.append(fid)
-	# 			# self.featurecollection.append(ftv)
-	# 			ftv = self.layer.GetNextFeature()
-	# 	# else:
-	# 	# 	self.fidtable = range(0,self.featurecount())
-	# 	# self.layer.ResetReading()
+	def attributefilter(self, filter):
+		self.layer.SetAttributeFilter(filter)
 
 	def createlayer(self, name, srs, Type='Polygon'):
 		gt = layertypes(Type)
-		self.srs = _getsrs(srs)
-		self.layer = self.datasource.CreateLayer(name, self.srs, gt)
-		# layer = self.datasource.CreateLayer(name, _getsrs(srs), gt)
-		self.layertype = gt
-		self.layerdef = self.layer.GetLayerDefn()
-		self.layertypestr = ogr.GeometryTypeToName(self.layerdef.GetGeomType())
-		self.layername = self.layer.GetDescription()
-		return self.layer
-		# return layer
+		layer = self.datasource.CreateLayer(name, _getsrs(srs), gt)
+		return layer
 
 	def getlayer(self, id):
 		self.layer = self.datasource.GetLayer(id)
+		if self.layer is None:
+			self.layer = self.datasource.GetLayer()
 		self.srs = self.layer.GetSpatialRef()
 		self.layerdef = self.layer.GetLayerDefn()
 		self.layertype = self.layerdef.GetGeomType()
 		self.layertypestr = ogr.GeometryTypeToName(self.layerdef.GetGeomType())
 		self.layername = self.layer.GetDescription()
-		# self.updatefidtable()
 		return self.layer
 
 	def getfeature(self, findex):
-		# if self.fidindex:
-		# 	self.feature = self.featurecollection[findex]
-		# else:
 		self.feature = self.layer.GetFeature(findex)
 		self.geom = self.feature.GetGeometryRef()
 		self.geomtype = self.geom.GetGeometryType()
 		self.geomtypestr = ogr.GeometryTypeToName(self.geomtype)
 		self.fid = self.feature.GetFID()
 		exportfeature = self.feature.ExportToJson()
-		# return self.feature
 		return exportfeature
 
 	def exportgeom(self, FID):
@@ -149,46 +129,52 @@ class Setsource:
 			self.geomtype = self.geom.GetGeometryType()
 			self.geomtypestr = ogr.GeometryTypeToName(self.geomtype)
 			self.fid = self.feature.GetFID()
-			ftv = self.layer.GetNextFeature()
 			yield self.feature
+			ftv = self.layer.GetNextFeature()
 
 
 	def savefile(self, filename, Transform=None):
-		dest = Setsource(filename, Action='create')
+		driver = ogr.GetDriverByName(filternames(filename))
+		dest = driver.CreateDataSource(filename)
+		drivername = dest.GetDriver().GetName()
 		style_table = self.datasource.GetStyleTable()
-		dest.datasource.SetStyleTable(style_table)
+		dest.SetStyleTable(style_table)
 		for ind in range(0, self.layercount()):
-			inlay = self.getlayer(ind)
+			self.getlayer(ind)
 			layergeomtype = self.layertypestr
-			if layergeomtype == 'Unknown (any)': # Layer without a geometry type (e.g. KML)
-				self.getfeature(0)  # Insecure, must improve
+			if layergeomtype == 'Unknown (any)':  # Layer without a geometry type (e.g. KML)
+				self.getfeature(0)  # Not secure, must improve
 				geome = self.geom
 				layergeomtype = ogr.GeometryTypeToName(geome.GetGeometryType())
-
+			else:
+				layergeomtype = _conformgpkg(self, drivername, layergeomtype)
 			destsrs = self.srs
 			if Transform is not None:
 				trans = Transformation(self.srs, Transform)
 				destsrs = Transform
-
-			dest.createlayer(self.layername, destsrs, Type=layergeomtype)
+			dest.CreateLayer(self.layername, _getsrs(destsrs), layertypes(layergeomtype))
+			olayer = dest.GetLayer(self.layername)
+			if olayer is None:
+				olayer = dest.GetLayer()
 			inatt = self.getattrtable()
-			dest.setattrtable(inatt)
+			for field in inatt:
+				fieldtype = fieldtypes(field[1])
+				olayer.CreateField(ogr.FieldDefn(field[0], fieldtype))
 			it = self.iterfeatures(Action='reset')
 			for feature in it:
-			# for g in range(self.featurecount()):
-			# 	self.getfeature(g)
-				featstyle = self.feature.GetStyleString()
+				featstyle = feature.GetStyleString()
 				geom = self.geom
 				if Transform is not None:
-					geom = trans.transform(geom)
-				ofeature = ogr.Feature(dest.layerdef)
+					geom = trans.transform(self.geom)
+				ofeature = ogr.Feature(olayer.GetLayerDefn())
+				geom = _conformgpkggeom(self, drivername, geom, layergeomtype)
 				ofeature.SetGeometry(geom)
 				ofeature.SetStyleString(featstyle)
-				for f in range(0, self.feature.GetFieldCount()):
-					ft = self.feature.GetField(f)
+				for f in range(0, feature.GetFieldCount()):
+					ft = feature.GetField(f)
 					ofeature.SetField(f, ft)
-				dest.createfeature(ofeature)
-		dest = None
+				olayer.CreateFeature(ofeature)
+	dest = None
 
 	def layercount(self):
 		return(len(self.datasource))
@@ -203,64 +189,52 @@ class Setsource:
 			fieldName = reg.GetName()
 			fieldType = reg.GetTypeName()
 			sch.append([fieldName, fieldType])
+		self.attrtable = sch
 		return sch
 
 	def setattrtable(self, attrtable):
+		create = True
 		for field in attrtable:  # recreates attribute table
-			fieldtype = fieldtypes(field[1])
-			self.layer.CreateField(ogr.FieldDefn(field[0], fieldtype))
+			if self.drivername == 'DXF':
+				create = dxffieldfilter(field[0])  # Unssopported by DXF driver if create = False
+			if create:
+				fieldtype = fieldtypes(field[1])
+				self.layer.CreateField(ogr.FieldDefn(field[0], fieldtype))
 
 	def createattr(self, name, Type='integer'):
 		fieldtype = fieldtypes(Type)
 		fdn = ogr.FieldDefn(name, fieldtype)
 		self.layer.CreateField(fdn)
 
+	def delattr(self, name):
+		at = self.getattrtable()
+		atn = []
+		for i in at:
+			atn.append(i[0])
+		id = atn.index(name)
+		self.layer.DeleteField(id)
 
 	def createfeature(self, feature):
-		# featurecounter = len(self.layer)
-		# feature.SetFID(featurecounter)
 		self.layer.CreateFeature(feature)
-		# self.feature = feature
-		# self.geom = self.feature.GetGeometryRef()
-		# self.fid = feature.GetFID()
-		# fid = feature.GetFID()
-		# if self.fidindex:
-		# 	self.fidtable.append(fid)
-			# self.featurecollection.append(feature)
 
-	def geom2feature(self, geom):
+	def delfeature(self, feature):
+		fid = getfid(feature)
+		# print(fid)
+		# try:
+		self.layer.DeleteFeature(fid)
+		# except:
+		# 	pass
+
+	def createfeatgeom(self, geom):
 		feature = ogr.Feature(self.layerdef)
 		feature.SetGeometry(geom)
-		# self.layer.CreateFeature(feature)
-		# self.feature = feature
-		# self.geom = self.feature.GetGeometryRef()
-		# self.fid = feature.GetFID()
-		# exportfeature = feature.ExportToJson()
-		# return self.feature
-		# return exportfeature
 		return feature
 
 	def setfield(self, feature, attr, value):
 		feature.SetField(attr, value)
-		# self.layer.SetFeature(feature)
 		fid = feature.GetFID()
 		if fid != -1:
 			self.layer.SetFeature(feature)
-
-
-			# raise ValueError('A very specific bad thing happened.')
-
-		# else:
-		# 	self.layer.SetFeature(feature)
-		# if self.fidindex and fid == -1:
-		# 	self.layer.SetFeature(self.feature)
-		# 	nfid = feature.GetFID()
-		# 	self.fidindex.append(nfid)
-
-	# def updatefield(self, attr, value):
-	# 	self.feature.SetField(attr, value)
-	# 	self.layer.SetFeature(self.feature)
-		# self.updatefidtable()
 
 	def getfield(self, field):
 		fv = self.feature.GetField(field)
@@ -452,7 +426,7 @@ def geomptcount(geom):
 	temp = [tp]
 	pc = 0
 	while len(temp) > 0:
-		tg = None
+		# tg = None
 		pp = temp.pop(0)
 		tg = _b2g(pp)
 		# strange.append(tg)
@@ -462,7 +436,7 @@ def geomptcount(geom):
 			pc += ptt
 		else:
 			for t in range(0, ct):
-				tc = None
+				# tc = None
 				geomo = tg.GetGeometryRef(t)
 				gt = geomo.GetGeometryName()
 				if gt == 'LINEARRING': # workaround because linearring to WKT or WKB doesn't work..
@@ -505,8 +479,11 @@ def splithalf(geom):
 
 
 def filternames(path):
+	if 'POSTGRESQL' in path.upper():
+		path = 'conn.POSTGRESQL'
 	cp = os.path.splitext(path)
 	ext = os.path.basename(cp[1]).upper()
+
 	ogt = [
 		[ '.SHP', 'ESRI Shapefile' ],
 		['.KML', 'LIBKML'],
@@ -514,9 +491,58 @@ def filternames(path):
 		# ['.KML', 'KML'],
 		# ['.KMZ', 'KML'],
 		['.GPKG', 'GPKG'],
-		['.GEOJSON', 'GEOJSON']
+		['.GEOJSON', 'GEOJSON'],
+		['.PDF', 'PDF'],
+		['.DXF', 'DXF'],
+		['.POSTGRESQL', 'POSTGRESQL']
 	]
 
 	for each in ogt:
 		if each[0] == ext:
 			return each[1]
+
+
+def dxffieldfilter(field):
+	validfields = ['LAYER', 'PAPERSPACE', 'SUBCLASSES', 'EXTENDEDENTITY',
+					'RAWCODEVALUES', 'LINETYPE', 'ENTITYHANDLE', 'TEXT']
+
+	if field.upper() not in validfields:
+		return False
+	else:
+		return True
+
+
+def _conformgpkg(source, dn, layergeomtype):  # https://github.com/qgis/QGIS/issues/26684#issuecomment-495888046
+	dn = dn.upper()
+	lu = layergeomtype.upper()
+	if (dn == 'GPKG' and source.drivername.upper() != 'GPKG') or \
+			(dn == 'POSTGRESQL' and source.drivername.upper() != 'POSTGRESQL'):
+		if 'POLYGON' in lu or 'LINE' in lu:
+			if 'MULTI' not in lu:
+				pts = lu.split(' ')
+				if 'POLYGON' in pts:
+					mi = 1
+				if 'LINE' in pts:
+					mi = 2
+				pts.insert(len(pts) - mi, 'MULTI')
+				lu = ' '.join(pts)
+				ws = "Warning:  will upgrade polygons/lines to multi type for consistency with " + dn
+				warnings.warn(ws)
+	return lu
+
+
+def _conformgpkggeom(source, dn, geom, layergeomtype): # https://github.com/qgis/QGIS/issues/26684#issuecomment-495888046
+	dn = dn.upper()
+	lu = layergeomtype.upper()
+	geomtname = ogr.GeometryTypeToName(geom.GetGeometryType()).upper()
+	if (dn == 'GPKG' and source.drivername.upper() != 'GPKG') or \
+			(dn == 'POSTGRESQL' and source.drivername.upper() != 'POSTGRESQL'):
+		if 'POLYGON' in lu and 'MULTI' not in geomtname:
+			mp = ogr.Geometry(ogr.wkbMultiPolygon)
+			mp.AddGeometry(geom)
+			geom = ogr.CreateGeometryFromWkb(mp.ExportToWkb())
+		if 'LINE' in lu and 'MULTI' not in geomtname:
+			mp = ogr.Geometry(ogr.wkbMultiLineString)
+			mp.AddGeometry(geom)
+			geom = ogr.CreateGeometryFromWkb(mp.ExportToWkb())
+	return geom

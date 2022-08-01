@@ -7,20 +7,22 @@ def main():
     KML 'Name' attribute. For polygons classify by 'Name' and assign Style colors for each class.'''
 
     inputpathpath = r'D:\shapes\temp'
-    infiles = scanfiles(inputpathpath, 'shp')
+    infiles_shp = scanfiles(inputpathpath, 'shp')
+    infiles_gpkg = scanfiles(inputpathpath, 'gpkg')
+    infiles_shp = infiles_shp + infiles_gpkg
 
     outkml = os.path.join(inputpathpath, 'outest.kml')
     tempout = Setsource('tempsource', Action='memory')
 
 
-    for file in infiles:
+    for file in infiles_shp:
         bn = os.path.basename(os.path.splitext(file)[0])
         inshape = Setsource(file, Action='open r')
         inshape.getlayer(0)
         classes = []
         uniquev = []
-        for ft in range(0, inshape.featurecount()):
-            inshape.getfeature(ft)
+        it = inshape.iterfeatures(Action='reset')
+        for feat in it:
             try:
                 fatt = inshape.getfield('Name')
             except:
@@ -44,6 +46,7 @@ def main():
                              'c:#FFAA00FF,s:0.9);LABEL(c:#FFFF00FF,w:80.0)')
         tempout.datasource.SetStyleTable(style_table)
         tempout.createlayer(bn, inshape.srs, Type=inshape.layertypestr)
+        tempout.getlayer(bn)
         atttrt = inshape.getattrtable()
         tempout.setattrtable(atttrt)
 
@@ -51,8 +54,8 @@ def main():
         suniquev.sort()
         ct = 0
         for reg in suniquev:
-            for ft in range(0, inshape.featurecount()):
-                infeat = inshape.getfeature(ft)
+            it2 = inshape.iterfeatures(Action='reset')
+            for feat in it2:
                 try:
                     fatt = inshape.getfield('Name')
                 except:
@@ -62,9 +65,9 @@ def main():
                     fatt = ''
                 if fatt == reg:
                     fgeom = inshape.geom
-                    nfeat = tempout.geom2feature(fgeom)
-                    for f in range(0, infeat.GetFieldCount()):
-                        ft = infeat.GetField(f)
+                    nfeat = tempout.createfeatgeom(fgeom)
+                    for f in range(0, inshape.feature.GetFieldCount()):
+                        ft = inshape.feature.GetField(f)
                         nfeat.SetField(f, ft)
                     geomtype = inshape.geomtypestr.upper()
                     if 'POLYGON' in geomtype:

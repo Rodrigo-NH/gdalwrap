@@ -19,6 +19,7 @@ def main():
             if gt not in geomtypes:
                 geomtypes.append(gt)
                 tempw.createlayer(gt, declaredSRS, Type=gt)
+                tempw.getlayer(gt)
                 tempw.setattrtable(attrbt)
             layindex = geomtypes.index(gt)
             tempw.getlayer(layindex)

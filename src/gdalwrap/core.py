@@ -231,7 +231,7 @@ class Datasource:
             id = atn.index(fieldname)
             self.layer.DeleteField(id)
 
-            def getfeature(self, fn):
+        def getfeature(self, fn):
             ft = self.Datasource._Feature(self, fn)
             # self.featcopy.append(ft)
             return ft

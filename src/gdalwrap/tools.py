@@ -11,6 +11,7 @@ from gdalwrap.core import *
 from gdalwrap.core import _g2b, _b2g
 
 
+
 def layerclip(layer, clipgeom):
 	sch = []
 	schema = layer.schema

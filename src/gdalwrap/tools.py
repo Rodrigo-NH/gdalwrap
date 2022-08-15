@@ -12,7 +12,13 @@ from gdalwrap.core import _g2b, _b2g
 
 
 def layerclip(layer, clipgeom):
-	schema = getschema(layer)
+	sch = []
+	schema = layer.schema
+	for reg in schema:
+		fieldName = reg.GetName()
+		fieldType = reg.GetTypeName()
+		sch.append([fieldName, fieldType])
+
 	features = []
 	defn = layer.GetLayerDefn()
 	layer.SetSpatialFilter(clipgeom)
@@ -21,7 +27,7 @@ def layerclip(layer, clipgeom):
 		cut = clipgeom.Intersection(d)
 		feature = ogr.Feature(defn)
 		feature.SetGeometry(cut)
-		for field in schema:
+		for field in sch:
 			fvalue = f.GetField(field[0])
 			feature.SetField(field[0], fvalue)
 		features.append(feature)
@@ -33,7 +39,8 @@ def splitvertices(feature, vcount):
 	if vcount < 3:
 		featpoll.append(feature)
 	else:
-		g = _g2b(getfeatgeom(feature))
+		geom = feature.GetGeometryRef()
+		g = _g2b(geom)
 		temppoll = []
 		temppoll.append(g)
 		polcoll = []
@@ -70,7 +77,9 @@ def splitvertices(feature, vcount):
 
 
 def splitrings(feature):
-	tg = getfeatgeom(feature)
+	geom = feature.GetGeometryRef()
+	igeom = _g2b(geom)
+	tg = _b2g(igeom)
 	typ = tg.GetGeometryType()
 	featpoll = []
 	if typ == 6 or typ == 3:
@@ -172,7 +181,7 @@ class Layergrid:
 	def gridindex(self, index):
 		return self.gridindex[index]
 
-	def getsrs(self):
+	def getspatialref(self):
 		return self.srsv
 
 def scanfiles(folder, extension):

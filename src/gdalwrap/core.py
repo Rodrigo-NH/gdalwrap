@@ -100,7 +100,7 @@ class Datasource:
             if layergeomtype == 'Unknown (any)':  # Layer without a geometry type (e.g. KML)
                 infeat = layer.getfeature(0)  # Not secure, must improve
                 geome = infeat.getgeom()
-                layergeomtype = geome.gettypename()
+                layergeomtype = geome.getgeomtypename()
             else:
                 layergeomtype = _conformgpkg(drivername, layergeomtype)
             destsrs = layer.layer.GetSpatialRef()
@@ -375,6 +375,7 @@ def layertypes(name):
         ['3D CURVE', ogr.wkbCurveZ],
         ['3D MEASURED CURVE', ogr.wkbCurveZM],
         ['GEOMETRY COLLECTION', ogr.wkbGeometryCollection],
+        ['GEOMETRYCOLLECTION', ogr.wkbGeometryCollection],
         ['3D GEOMETRY COLLECTION', ogr.wkbGeometryCollection25D],
         ['MEASURED GEOMETRY COLLECTION', ogr.wkbGeometryCollectionM],
         ['3D MEASURED GEOMETRY COLLECTION', ogr.wkbGeometryCollectionZM],

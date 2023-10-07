@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gdalwrap"
-version = "1.1.2b3"
+version = "1.1.1"
 authors = [
   { name="Rodrigo Nascimento Hernandez", email="rodrigomdev@gmail.com" },
 ]

@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gdalwrap"
+version = "1.1.2b3"
+authors = [
+  { name="Rodrigo Nascimento Hernandez", email="rodrigomdev@gmail.com" },
+]
+description = "GDAL python bindings wrapper and helper functions."
+readme = "README.md"
+requires-python = ">=3.1"
+dependencies = [
+
+	]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: IPython",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Topic :: Scientific/Engineering :: GIS",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gdalwrap",]
+
+[project.urls]
+"Homepage" = "https://github.com/Rodrigo-NH/gdalwrap"
+"Bug Tracker" = "https://github.com/Rodrigo-NH/gdalwrap/issues"
